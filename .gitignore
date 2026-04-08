@@ -18,4 +18,5 @@ cachedir/
 *.sim
 *.stt
 .DS_Store
-*.ico
+*.ico_models_data.py
+dist/
