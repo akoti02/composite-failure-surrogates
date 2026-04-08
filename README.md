@@ -23,23 +23,16 @@ This repository contains the complete codebase for a progressive FEA–ML surrog
 │   ├── v7/                 # Abaqus jagged cracks + Hashin (3-stage architecture)
 │   ├── v8/                 # CalculiX validation + test suite
 │   ├── v9/                 # 20k cloud campaign (laptop–cloud consistency)
-│   ├── v10/                # 101k production campaign (GCP, $73)
+│   ├── v10/                # 101k production campaign + GCP orchestration ($73)
 │   └── v11/                # CompositeNet 1.155M planning (future work)
 │
-├── ml/                     # Machine learning training and inference
-│   ├── v1/                 # Isotropic baseline (Ridge, RF, GB, XGB, NN)
-│   ├── v2/                 # Elliptical defects (7 features, 300 samples)
-│   ├── v7/                 # Jagged cracks (68 features, 891 samples)
-│   └── v10/                # 101k-scale pipeline
-│       ├── training/       # Main ML pipeline + model export
-│       ├── experiments/    # Ablation, class weights, mesh convergence
-│       └── app/            # Streamlit surrogate prediction app
-│
-├── infrastructure/         # Cloud deployment scripts
-│   └── gcp/                # GCP VM orchestration (PowerShell + bash)
-│
-└── docs/                   # Version documentation
-    └── versions/           # Per-version design notes (V1–V11)
+└── ml/                     # Machine learning training and inference
+    ├── v1/                 # Isotropic baseline (Ridge, RF, GB, XGB, NN)
+    ├── v2/                 # Elliptical defects (7 features, 300 samples)
+    ├── v7/                 # Jagged cracks (68 features, 891 samples)
+    └── v10/                # 101k-scale pipeline
+        ├── training/       # Main ML pipeline, experiments + model export
+        └── app/            # Streamlit surrogate prediction app
 ```
 ## Version Timeline
 
