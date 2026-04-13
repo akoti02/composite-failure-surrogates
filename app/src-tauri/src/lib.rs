@@ -35,7 +35,7 @@ fn spawn_sidecar() -> Result<SidecarProc, String> {
             .parent()
             .ok_or("Cannot find exe directory")?
             .to_path_buf();
-        Command::new(exe_dir.join("rp3-sidecar.exe"))
+        Command::new(exe_dir.join(if cfg!(target_os = "windows") { "rp3-sidecar.exe" } else { "rp3-sidecar" }))
     };
 
     cmd.stdin(Stdio::piped())
