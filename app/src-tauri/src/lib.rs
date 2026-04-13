@@ -26,7 +26,9 @@ fn spawn_sidecar() -> Result<SidecarProc, String> {
         .join("sidecar");
 
     let mut cmd = if cfg!(debug_assertions) {
-        let mut c = Command::new("python");
+        // On macOS/Linux, "python" may not exist — try "python3" first
+        let python_cmd = if cfg!(target_os = "windows") { "python" } else { "python3" };
+        let mut c = Command::new(python_cmd);
         c.arg(sidecar_dir.join("server.py"));
         c
     } else {

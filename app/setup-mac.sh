@@ -5,26 +5,54 @@
 set -e
 
 echo "=== RP3 App — Mac Setup ==="
+echo ""
 
-# Check prerequisites
-command -v node >/dev/null 2>&1 || { echo "Node.js required. Install via: brew install node"; exit 1; }
-command -v cargo >/dev/null 2>&1 || { echo "Rust required. Install via: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"; exit 1; }
-command -v python3 >/dev/null 2>&1 || { echo "Python 3 required. Install via: brew install python3"; exit 1; }
+# Check Xcode Command Line Tools
+if ! xcode-select -p &>/dev/null; then
+    echo "Xcode Command Line Tools required. Installing..."
+    xcode-select --install
+    echo "Please re-run this script after Xcode tools finish installing."
+    exit 1
+fi
+echo "[ok] Xcode Command Line Tools"
+
+# Check Node.js
+if ! command -v node &>/dev/null; then
+    echo "Node.js required. Install via: brew install node"
+    exit 1
+fi
+echo "[ok] Node.js $(node --version)"
+
+# Check Rust
+if ! command -v cargo &>/dev/null; then
+    echo "Rust required. Installing via rustup..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+fi
+echo "[ok] Rust $(cargo --version)"
+
+# Check Python 3
+if ! command -v python3 &>/dev/null; then
+    echo "Python 3 required. Install via: brew install python3"
+    exit 1
+fi
+echo "[ok] Python $(python3 --version)"
 
 # Install Node dependencies
+echo ""
 echo "Installing Node dependencies..."
 npm install
 
 # Install Python ML dependencies for sidecar
+echo ""
 echo "Installing Python ML dependencies..."
 pip3 install numpy xgboost scikit-learn
-
-# Install Tauri CLI
-echo "Installing Tauri CLI..."
-npm install -g @tauri-apps/cli
 
 echo ""
 echo "=== Setup complete ==="
 echo ""
 echo "To run in dev mode:  npx tauri dev"
 echo "To build release:    npx tauri build"
+echo ""
+echo "Note: First launch will compile the Rust backend (~2 min)."
+echo "Subsequent launches are instant."
