@@ -13,9 +13,9 @@ interface Props {
 }
 
 export function Header({ status, modelsReady, predicting, onPreset, onExport, hasResults, onPredict, onReset }: Props) {
-  const dotColor = predicting ? COL.warning : modelsReady ? COL.success : COL.textDim;
+  const dotColor = predicting ? COL.accent : modelsReady ? COL.success : COL.textDim;
   const dotClass = predicting ? "dot-pulse-fast" : modelsReady ? "" : "dot-pulse";
-  const dotLabel = predicting ? "Analysing" : modelsReady ? "Ready" : "Loading";
+  const dotLabel = predicting ? "Computing" : modelsReady ? "Live" : "Loading";
 
   return (
     <header
@@ -101,7 +101,7 @@ export function Header({ status, modelsReady, predicting, onPreset, onExport, ha
           onClick={onPredict}
           disabled={!modelsReady || predicting}
         >
-          {predicting ? "Analysing..." : <>Run <span className="text-[9px] opacity-50 ml-1">Enter</span></>}
+          {predicting ? "•••" : <>Save <span className="text-[9px] opacity-50 ml-1">Enter</span></>}
         </button>
       </div>
 

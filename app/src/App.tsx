@@ -262,27 +262,41 @@ function AppInner() {
     setResults(null);
   }, []);
 
-  const handlePredict = useCallback(async () => {
-    if (!modelsReady || predicting) return;
+  // Core prediction function — used by both auto-predict and manual Run
+  const predictingRef = useRef(false);
+  const runPrediction = useCallback(async (saveToHistory: boolean) => {
+    if (!modelsReady || predictingRef.current) return;
+    predictingRef.current = true;
     setPredicting(true);
-    setStatus("Analysing...");
     try {
       const raw = buildRawInputs(nDefects, pressureX, pressureY, plyThickness, layupRotation, defects);
       const resp = await invoke<{ ok: boolean; results: PredictionResults; error?: string }>("predict", { params: raw });
       if (resp.ok) {
         setResults(resp.results);
-        setStatus("Analysis complete");
-        // Auto-save to history
-        addHistoryEntry(nDefects, pressureX, pressureY, resp.results);
+        setStatus("Live");
+        if (saveToHistory) addHistoryEntry(nDefects, pressureX, pressureY, resp.results);
       } else {
         setStatus(`Error: ${resp.error}`);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setStatus(`Error: ${msg.slice(0, 60)}`);
+      if (!msg.includes("__TAURI__")) setStatus(`Error: ${msg.slice(0, 60)}`);
     }
+    predictingRef.current = false;
     setPredicting(false);
-  }, [modelsReady, predicting, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects]);
+  }, [modelsReady, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects]);
+
+  // Live prediction — auto-triggers on any input change (200ms debounce)
+  useEffect(() => {
+    if (!modelsReady) return;
+    const timer = setTimeout(() => runPrediction(false), 200);
+    return () => clearTimeout(timer);
+  }, [modelsReady, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects, runPrediction]);
+
+  // Manual predict (Run button / Enter key) — also saves to history
+  const handlePredict = useCallback(() => {
+    runPrediction(true);
+  }, [runPrediction]);
 
   const handleReset = useCallback(() => {
     setNDefects(3);

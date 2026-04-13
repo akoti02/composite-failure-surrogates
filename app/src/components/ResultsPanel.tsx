@@ -183,7 +183,7 @@ export function ResultsPanel({ results, nDefects, onExpandModal }: Props) {
             <path d="M3 3v18h18" />
             <path d="M7 16l4-6 4 4 5-8" />
           </svg>
-          <span className="text-[11px] mt-3" style={{ color: COL.textDim }}>Run a prediction to see results</span>
+          <span className="text-[11px] mt-3" style={{ color: COL.textDim }}>Loading models...</span>
         </div>
       )}
 

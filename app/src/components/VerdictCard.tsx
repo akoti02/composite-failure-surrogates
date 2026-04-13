@@ -3,7 +3,7 @@ import { COL } from "../lib/constants";
 import type { PredictionResults, VerdictLevel } from "../lib/types";
 
 function getVerdict(results: PredictionResults | null): { level: VerdictLevel; title: string; desc: string } {
-  if (!results) return { level: "awaiting", title: "Awaiting Analysis", desc: "Configure parameters and run prediction" };
+  if (!results) return { level: "awaiting", title: "Initialising...", desc: "Predictions update live as you change inputs" };
 
   const tw = results.tsai_wu_index ?? 0;
   const ftw = results.failed_tsai_wu ?? 0;
