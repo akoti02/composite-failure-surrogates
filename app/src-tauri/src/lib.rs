@@ -14,7 +14,9 @@ struct SidecarProc {
 
 impl Drop for SidecarProc {
     fn drop(&mut self) {
-        let _ = self.child.kill();
+        if let Err(e) = self.child.kill() {
+            eprintln!("Warning: failed to kill sidecar: {}", e);
+        }
         let _ = self.child.wait();
     }
 }
@@ -89,7 +91,14 @@ fn send_command(proc: &mut SidecarProc, cmd: &Value) -> Result<Value, String> {
     }
 
     serde_json::from_str(&response)
-        .map_err(|e| format!("Parse error: {} (raw: {})", e, response.trim()))
+        .map_err(|e| {
+            let preview = if response.len() > 200 {
+                format!("{}...", &response[..200])
+            } else {
+                response.trim().to_string()
+            };
+            format!("Parse error: {} (raw: {})", e, preview)
+        })
 }
 
 /// Ensure the sidecar is running, respawning if needed. Returns a mutable ref to the proc.
@@ -124,14 +133,20 @@ async fn load_models(sidecar: State<'_, Sidecar>) -> Result<Value, String> {
 #[tauri::command]
 async fn predict(params: Value, sidecar: State<'_, Sidecar>) -> Result<Value, String> {
     let sidecar = sidecar.0.clone();
-    tokio::task::spawn_blocking(move || {
+
+    let prediction = tokio::task::spawn_blocking(move || {
         let mut guard = sidecar.lock().map_err(|e| e.to_string())?;
         let proc = ensure_sidecar(&mut guard)?;
         let cmd = serde_json::json!({"cmd": "predict", "params": params});
         send_command(proc, &cmd)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    });
+
+    // 45-second timeout prevents frozen UI if sidecar hangs
+    match tokio::time::timeout(std::time::Duration::from_secs(45), prediction).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(e)) => Err(format!("Prediction task failed: {}", e)),
+        Err(_) => Err("Prediction timed out after 45 seconds".to_string()),
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
