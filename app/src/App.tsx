@@ -397,7 +397,7 @@ function AppInner() {
       <div className="flex-1 min-h-0">
         {/* Analysis tab — original layout */}
         {activeTab === "analysis" && (
-          <div className="h-full grid grid-cols-[45fr_55fr] min-h-0">
+          <div className="h-full grid grid-cols-1 lg:grid-cols-[45fr_55fr] min-h-0">
             <div className="flex flex-col min-h-0" style={{ borderRight: `1px solid ${COL.border}` }}>
               <div
                 className="shrink-0 px-3 pt-2 pb-1 relative group"

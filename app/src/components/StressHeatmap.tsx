@@ -525,8 +525,8 @@ export function StressHeatmap({ defects, nDefects, pressureX, pressureY, predict
         <div className="flex-1 relative rounded-lg overflow-hidden" style={{ background: COL.canvasBg, border: `1px solid ${COL.border}` }}>
           <canvas
             ref={canvasRef}
-            width={1200}
-            height={600}
+            width={Math.min(1200 * (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1), 2400)}
+            height={Math.min(600 * (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1), 1200)}
             className="w-full h-full"
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setMousePos(null)}

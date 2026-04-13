@@ -252,8 +252,8 @@ function FailureCurve({ curve }: { curve: { loadFactor: number; maxFI: number; f
       )}
 
       {/* Axes labels */}
-      <text x={w / 2} y={h - 2} fill={COL.textDim} fontSize={9} textAnchor="middle">Load Factor</text>
-      <text x={8} y={h / 2} fill={COL.textDim} fontSize={9} textAnchor="middle" transform={`rotate(-90, 8, ${h / 2})`}>Max FI</text>
+      <text x={w / 2} y={h - 2} fill={COL.textDim} fontSize={9} textAnchor="middle">Load Factor (multiplier on applied Nx/Ny/Nxy)</text>
+      <text x={8} y={h / 2} fill={COL.textDim} fontSize={9} textAnchor="middle" transform={`rotate(-90, 8, ${h / 2})`}>Max Failure Index (≥1.0 = failure)</text>
 
       {/* Tick labels */}
       {[0, 0.5, 1, 1.5, 2].map(lf => (
