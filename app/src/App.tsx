@@ -1,6 +1,41 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Component } from "react";
+import type { ReactNode, ErrorInfo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Header } from "./components/Header";
+
+// Error boundary to prevent white screen of death
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("RP3 Error Boundary:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, color: "#f87171", background: "#0a0a0b", height: "100vh", fontFamily: "monospace" }}>
+          <h2 style={{ fontSize: 18, marginBottom: 12 }}>Something went wrong</h2>
+          <p style={{ fontSize: 13, color: "#a1a1aa", marginBottom: 16 }}>{this.state.error}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: "" })}
+            style={{ padding: "8px 16px", background: "#7c3aed", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { InputPanel } from "./components/InputPanel";
 import { ResultsPanel } from "./components/ResultsPanel";
 import { PlateCanvas } from "./components/PlateCanvas";
@@ -44,10 +79,29 @@ function buildRawInputs(
   return raw;
 }
 
-function formatResultsForExport(results: PredictionResults, nDefects: number): string {
+function formatResultsForExport(
+  results: PredictionResults, nDefects: number,
+  pressureX?: number, pressureY?: number, plyThickness?: number, layupRotation?: number,
+  defects?: DefectParams[]
+): string {
   const lines: string[] = ["RP3 Prediction Results", "=====================", ""];
   const fmt = (v?: number) => v != null && isFinite(v) ? v.toFixed(4) : "--";
   const fmtMPa = (v?: number) => v != null && isFinite(v) ? `${v.toFixed(2)} MPa` : "--";
+
+  // Include input parameters so results are reproducible
+  lines.push("Input Configuration:");
+  lines.push(`  Number of defects: ${nDefects}`);
+  if (pressureX != null) lines.push(`  Pressure X: ${pressureX} MPa`);
+  if (pressureY != null) lines.push(`  Pressure Y: ${pressureY} MPa`);
+  if (plyThickness != null) lines.push(`  Ply thickness: ${plyThickness} mm`);
+  if (layupRotation != null) lines.push(`  Layup rotation: ${layupRotation}°`);
+  if (defects) {
+    for (let i = 0; i < nDefects; i++) {
+      const d = defects[i];
+      if (d) lines.push(`  Defect ${i+1}: x=${d.x}mm y=${d.y}mm len=${d.half_length*2}mm w=${d.width}mm θ=${d.angle}°`);
+    }
+  }
+  lines.push("");
 
   lines.push("Stress Analysis:");
   lines.push(`  Peak Stress (von Mises): ${fmtMPa(results.max_mises)}`);
@@ -106,7 +160,7 @@ function BuildAgeBanner() {
   );
 }
 
-export default function App() {
+function AppInner() {
   const [modelsReady, setModelsReady] = useState(false);
   const [modelCount, setModelCount] = useState(0);
   const [status, setStatus] = useState("Loading models...");
@@ -215,12 +269,12 @@ export default function App() {
 
   const handleExport = useCallback(() => {
     if (!results) return;
-    const text = formatResultsForExport(results, nDefects);
+    const text = formatResultsForExport(results, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects);
     navigator.clipboard.writeText(text).then(() => {
       setStatus("Results copied to clipboard");
       setTimeout(() => setStatus("Analysis complete"), 2000);
     });
-  }, [results, nDefects]);
+  }, [results, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects]);
 
   // Enter key triggers predict — only when not focused on an input
   useEffect(() => {
@@ -427,5 +481,13 @@ export default function App() {
 
       <SplashScreen onReady={modelsReady} />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
