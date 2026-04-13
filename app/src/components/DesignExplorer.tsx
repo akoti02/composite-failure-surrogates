@@ -666,10 +666,10 @@ export function DesignExplorer(props: ExplorerProps) {
             onClick={() => {
               let csv = "";
               if (result1D && mode === "sweep1d") {
-                const cols = [result1D.paramLabel, ...OUTPUT_FIELDS.map(f => f.label)];
+                const cols = ["Parameter Value", ...OUTPUT_FIELDS.map(f => f.label)];
                 csv = cols.join(",") + "\n";
-                for (let i = 0; i < result1D.xValues.length; i++) {
-                  csv += [result1D.xValues[i], ...OUTPUT_FIELDS.map(f => result1D.outputs[f.id]?.[i] ?? "")].join(",") + "\n";
+                for (let i = 0; i < result1D.paramValues.length; i++) {
+                  csv += [result1D.paramValues[i], ...OUTPUT_FIELDS.map(f => result1D.outputs[f.id]?.[i] ?? "")].join(",") + "\n";
                 }
               } else if (resultMC && mode === "montecarlo") {
                 const cols = OUTPUT_FIELDS.map(f => f.label);

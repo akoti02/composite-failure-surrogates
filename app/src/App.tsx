@@ -21,12 +21,12 @@ class ErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: 40, color: "#f87171", background: "#0a0a0b", height: "100vh", fontFamily: "monospace" }}>
+        <div style={{ padding: 40, color: COL.danger, background: COL.bgDark, height: "100vh", fontFamily: "monospace" }}>
           <h2 style={{ fontSize: 18, marginBottom: 12 }}>Something went wrong</h2>
-          <p style={{ fontSize: 13, color: "#a1a1aa", marginBottom: 16 }}>{this.state.error}</p>
+          <p style={{ fontSize: 13, color: COL.textMid, marginBottom: 16 }}>{this.state.error}</p>
           <button
             onClick={() => this.setState({ hasError: false, error: "" })}
-            style={{ padding: "8px 16px", background: "#7c3aed", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+            style={{ padding: "8px 16px", background: COL.accent, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
           >
             Try Again
           </button>

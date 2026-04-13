@@ -92,7 +92,7 @@ def handle_predict(params):
             continue
         try:
             val = predict_single(model_entry, scaler, features)
-            results[target] = _sanitize_value(val)
+            results[target] = val  # sanitized by _sanitize_response before JSON output
         except Exception as e:
             results[target] = None
             errors[target] = str(e)
