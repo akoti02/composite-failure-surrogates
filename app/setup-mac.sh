@@ -43,10 +43,20 @@ echo ""
 echo "Installing Node dependencies..."
 npm install
 
-# Install Python ML dependencies for sidecar
+# Install Python ML dependencies + PyInstaller for sidecar
 echo ""
 echo "Installing Python ML dependencies..."
-pip3 install numpy xgboost scikit-learn
+pip3 install numpy xgboost scikit-learn pyinstaller
+
+# Build sidecar binary for macOS (needed for release builds)
+echo ""
+echo "Building macOS sidecar binary..."
+cd sidecar
+pyinstaller --onefile --name rp3-sidecar server.py \
+  --hidden-import inference --hidden-import _models_data \
+  --add-data "_models_data.py:."
+echo "[ok] Sidecar built at sidecar/dist/rp3-sidecar"
+cd ..
 
 echo ""
 echo "=== Setup complete ==="

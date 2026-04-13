@@ -36,6 +36,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["../sidecar/dist/rp3-sidecar.exe"]
+    "resources": [
+      "../sidecar/dist/rp3-sidecar.exe",
+      "../sidecar/dist/rp3-sidecar"
+    ]
   }
 }
