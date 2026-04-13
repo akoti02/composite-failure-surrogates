@@ -185,6 +185,34 @@ function AppInner() {
   const [activeTab, setActiveTab] = useState<AppTab>("analysis");
   const [compareSnapshots, setCompareSnapshots] = useState<AnalysisSnapshot[]>([]);
 
+  // Auto-save state to localStorage so users don't lose work
+  useEffect(() => {
+    const saved = localStorage.getItem("rp3-autosave");
+    if (saved) {
+      try {
+        const s = JSON.parse(saved);
+        if (s.nDefects) setNDefects(s.nDefects);
+        if (s.pressureX != null) setPressureX(s.pressureX);
+        if (s.pressureY != null) setPressureY(s.pressureY);
+        if (s.plyThickness) setPlyThickness(s.plyThickness);
+        if (s.layupRotation != null) setLayupRotation(s.layupRotation);
+        if (s.defects) setDefects(s.defects);
+        if (s.laminateCode) setLaminateCode(s.laminateCode);
+        if (s.laminateMaterialId) setLaminateMaterialId(s.laminateMaterialId);
+      } catch { /* ignore corrupt saves */ }
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem("rp3-autosave", JSON.stringify({
+        nDefects, pressureX, pressureY, plyThickness, layupRotation,
+        defects, laminateCode, laminateMaterialId,
+      }));
+    }, 500); // debounce saves by 500ms
+    return () => clearTimeout(timer);
+  }, [nDefects, pressureX, pressureY, plyThickness, layupRotation, defects, laminateCode, laminateMaterialId]);
+
   // Load models on mount
   useEffect(() => {
     if (loadedRef.current) return;
@@ -332,14 +360,25 @@ function AppInner() {
         onPredict={handlePredict} onReset={handleReset}
       />
 
-      {/* Tab bar */}
+      {/* Tab bar — arrow keys navigate between tabs */}
       <div
         className="shrink-0 flex items-center gap-0.5 px-4 h-9"
+        role="tablist"
+        aria-label="Application sections"
         style={{ background: COL.bgDark, borderBottom: `1px solid ${COL.border}` }}
+        onKeyDown={(e) => {
+          const idx = TABS.findIndex(t => t.id === activeTab);
+          if (e.key === "ArrowRight" && idx < TABS.length - 1) { setActiveTab(TABS[idx + 1].id); e.preventDefault(); }
+          if (e.key === "ArrowLeft" && idx > 0) { setActiveTab(TABS[idx - 1].id); e.preventDefault(); }
+        }}
       >
         {TABS.map(tab => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`tabpanel-${tab.id}`}
+            tabIndex={activeTab === tab.id ? 0 : -1}
             className="flex items-center gap-1.5 px-3 py-1 rounded-t-md text-[11px] font-semibold transition-all"
             style={{
               background: activeTab === tab.id ? COL.bg : "transparent",

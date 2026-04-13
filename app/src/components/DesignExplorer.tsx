@@ -656,6 +656,37 @@ export function DesignExplorer(props: ExplorerProps) {
         >
           {running ? `${Math.round(progress * 100)}% — Stop` : !props.modelsReady ? "Models loading..." : "Run"}
         </button>
+
+        {/* CSV Export */}
+        {(result1D || resultMC || resultSens) && !running && (
+          <button
+            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold btn-press"
+            style={{ background: COL.panel, color: COL.textMid, border: `1px solid ${COL.border}` }}
+            aria-label="Export results as CSV"
+            onClick={() => {
+              let csv = "";
+              if (result1D && mode === "sweep1d") {
+                const cols = [result1D.paramLabel, ...OUTPUT_FIELDS.map(f => f.label)];
+                csv = cols.join(",") + "\n";
+                for (let i = 0; i < result1D.xValues.length; i++) {
+                  csv += [result1D.xValues[i], ...OUTPUT_FIELDS.map(f => result1D.outputs[f.id]?.[i] ?? "")].join(",") + "\n";
+                }
+              } else if (resultMC && mode === "montecarlo") {
+                const cols = OUTPUT_FIELDS.map(f => f.label);
+                csv = cols.join(",") + "\n";
+                const n = resultMC.outputs[OUTPUT_FIELDS[0].id]?.length ?? 0;
+                for (let i = 0; i < n; i++) {
+                  csv += OUTPUT_FIELDS.map(f => resultMC.outputs[f.id]?.[i] ?? "").join(",") + "\n";
+                }
+              }
+              if (csv) {
+                navigator.clipboard.writeText(csv);
+              }
+            }}
+          >
+            📋 Copy CSV
+          </button>
+        )}
       </div>
 
       {/* Progress bar */}

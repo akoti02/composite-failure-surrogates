@@ -331,6 +331,8 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
             value={laminateCode}
             onChange={(e) => setLaminateCode(e.target.value)}
             placeholder="[0/±45/90]s"
+            aria-label="Laminate code"
+            data-tooltip="Syntax: [angle/angle/...]s — ± means both +/- angles, s = symmetric. Examples: [0/90]s, [0/±45/90]s, [45/-45]2s"
           />
         </div>
 
