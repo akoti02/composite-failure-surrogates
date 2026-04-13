@@ -1355,11 +1355,13 @@ def main():
 
         plot_cv_comparison(summary, target, task='regression')
 
-        # Feature importance + SHAP
+        # Feature importance + SHAP (must use scaled X — model was trained on scaled data)
+        shap_scaler = StandardScaler()
+        X_scaled_for_shap = shap_scaler.fit_transform(X)
         for mname in ['XGBoost', 'CatBoost', 'Random Forest']:
             if mname in last_models and hasattr(last_models[mname], 'feature_importances_'):
                 plot_feature_importance(last_models[mname], features, target, mname)
-                plot_shap_analysis(last_models[mname], X, features, target, mname)
+                plot_shap_analysis(last_models[mname], X_scaled_for_shap, features, target, mname)
                 break
 
         # Scatter plot (best model — scale inside split)
