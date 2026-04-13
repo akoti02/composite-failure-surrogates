@@ -30,7 +30,7 @@ export const COL = {
   // Text hierarchy
   text: "#ededef",
   textMid: "#a0a0a8",
-  textDim: "#5a5a65",
+  textDim: "#6b6b78", // bumped from #5a5a65 for WCAG AA contrast
 
   // Borders
   border: "rgba(255, 255, 255, 0.06)",
@@ -53,7 +53,16 @@ export const TOOLTIPS: Record<string, string> = {
   width: "Opening width of the defect",
   angle: "Orientation of the defect relative to the fibre direction",
   roughness: "Surface roughness at the defect site (0 = smooth, 1 = rough)",
-  tsai_wu: "Combined stress failure index. Values >= 1.0 predict failure",
+  tsai_wu: "Combined stress failure index. Values >= 1.0 predict failure. E.g. 0.85 = 85% of failure threshold.",
   hashin: "Damage mode indices. Values >= 1.0 predict mode-specific failure",
+  hashin_ft: "Fibre tension — fibre breakage under tensile load",
+  hashin_fc: "Fibre compression — fibre buckling/kinking under compressive load",
+  hashin_mt: "Matrix tension — resin cracking between fibres under tension",
+  hashin_mc: "Matrix compression — resin crushing between fibres under compression",
   mises: "von Mises equivalent stress combining all stress components",
+  s11: "Stress in the fibre direction (longitudinal)",
+  s12: "In-plane shear stress between fibre and transverse directions",
+  n_defects: "Number of crack-like defects in the composite plate (1-5)",
+  x_position: "Horizontal position of defect centre on the plate (0-100 mm)",
+  y_position: "Vertical position of defect centre on the plate (0-50 mm)",
 };
