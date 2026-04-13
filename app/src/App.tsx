@@ -41,15 +41,12 @@ import { ResultsPanel } from "./components/ResultsPanel";
 import { PlateCanvas } from "./components/PlateCanvas";
 import { FocusModal } from "./components/FocusModal";
 import { SplashScreen } from "./components/SplashScreen";
-import { StressHeatmap } from "./components/StressHeatmap";
 import { LaminateBuilder } from "./components/LaminateBuilder";
 import { DesignExplorer } from "./components/DesignExplorer";
-import { ProjectManager } from "./components/ProjectManager";
 import type { RawInputs, PredictionResults, DefectParams } from "./lib/types";
 import { PRESETS, DEFAULT_DEFECT, DEFAULT_DEFECTS } from "./lib/presets";
 import { MAX_DEFECTS, COL } from "./lib/constants";
 import { addHistoryEntry } from "./lib/project";
-import type { AnalysisSnapshot } from "./lib/project";
 
 function buildRawInputs(
   nDefects: number,
@@ -132,14 +129,11 @@ const initDefects = (): DefectParams[] =>
   Array.from({ length: MAX_DEFECTS }, (_, i) => ({ ...(DEFAULT_DEFECTS[i] || DEFAULT_DEFECT) }));
 
 type FocusTarget = null | "canvas" | "results";
-type AppTab = "analysis" | "heatmap" | "laminate" | "explorer" | "project";
+type AppTab = "analysis" | "explorer";
 
 const TABS: { id: AppTab; label: string; icon: string }[] = [
   { id: "analysis", label: "Analysis", icon: "◎" },
-  { id: "heatmap", label: "Stress Field", icon: "▦" },
-  { id: "laminate", label: "Laminate", icon: "◈" },
   { id: "explorer", label: "Explorer", icon: "◐" },
-  { id: "project", label: "Project", icon: "◫" },
 ];
 
 /** Build age warning — shows banner if running a build older than 24h */
@@ -183,7 +177,7 @@ function AppInner() {
   // UI state
   const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("analysis");
-  const [compareSnapshots, setCompareSnapshots] = useState<AnalysisSnapshot[]>([]);
+  // Project save/compare removed — auto-save handles persistence
 
   // Auto-save state to localStorage so users don't lose work
   useEffect(() => {
@@ -339,28 +333,6 @@ function AppInner() {
     });
   }, []);
 
-  const handleRestoreSnapshot = useCallback((snap: AnalysisSnapshot) => {
-    setNDefects(snap.nDefects);
-    setPressureX(snap.pressureX);
-    setPressureY(snap.pressureY);
-    setPlyThickness(snap.plyThickness);
-    setLayupRotation(snap.layupRotation);
-    const newDefects = initDefects();
-    snap.defects.forEach((d, i) => { newDefects[i] = { ...d }; });
-    setDefects(newDefects);
-    setResults(snap.results);
-    setActiveTab("analysis");
-    setStatus(snap.results ? "Snapshot restored" : "Snapshot restored (no results)");
-  }, []);
-
-  const handleToggleCompare = useCallback((snap: AnalysisSnapshot) => {
-    setCompareSnapshots(prev => {
-      const exists = prev.some(s => s.id === snap.id);
-      if (exists) return prev.filter(s => s.id !== snap.id);
-      return [...prev, snap];
-    });
-  }, []);
-
   const canvasProps = {
     nDefects, defects, pressureX, pressureY, layupRotation,
   };
@@ -410,9 +382,10 @@ function AppInner() {
       {/* Tab content */}
       <div className="flex-1 min-h-0">
         {/* Analysis tab — original layout */}
+        {/* Analysis tab — inputs + predictions + laminate info */}
         {activeTab === "analysis" && (
           <div className="h-full grid grid-cols-1 lg:grid-cols-[45fr_55fr] min-h-0">
-            <div className="flex flex-col min-h-0" style={{ borderRight: `1px solid ${COL.border}` }}>
+            <div className="flex flex-col min-h-0 overflow-y-auto" style={{ borderRight: `1px solid ${COL.border}` }}>
               <div
                 className="shrink-0 px-3 pt-2 pb-1 relative group"
                 style={{ background: COL.bg, borderBottom: `1px solid ${COL.border}` }}
@@ -423,6 +396,7 @@ function AppInner() {
                   style={{ color: COL.textDim, background: "rgba(0,0,0,0.5)", border: `1px solid ${COL.border}` }}
                   onClick={() => setFocusTarget("canvas")}
                   data-tooltip="Expand canvas"
+                  aria-label="Expand plate canvas"
                 >
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                     <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
@@ -437,6 +411,15 @@ function AppInner() {
                 layupRotation={layupRotation} setLayupRotation={setLayupRotation}
                 defects={defects} updateDefect={updateDefect}
               />
+              {/* Laminate section — integrated into Analysis view */}
+              <div style={{ borderTop: `1px solid ${COL.border}` }}>
+                <LaminateBuilder
+                  laminateCode={laminateCode}
+                  onLaminateCodeChange={setLaminateCode}
+                  materialId={laminateMaterialId}
+                  onMaterialIdChange={setLaminateMaterialId}
+                />
+              </div>
             </div>
             <ResultsPanel
               results={results}
@@ -446,36 +429,7 @@ function AppInner() {
           </div>
         )}
 
-        {/* Stress Heatmap tab */}
-        {activeTab === "heatmap" && (
-          <div className="h-full px-4 py-3">
-            <StressHeatmap
-              defects={defects}
-              nDefects={nDefects}
-              pressureX={pressureX}
-              pressureY={pressureY}
-              predictions={results}
-              laminateCode={laminateCode}
-              laminateMaterialId={laminateMaterialId}
-              plyThickness={plyThickness}
-              layupRotation={layupRotation}
-            />
-          </div>
-        )}
-
-        {/* Laminate Builder tab */}
-        {activeTab === "laminate" && (
-          <div className="h-full px-4 py-3">
-            <LaminateBuilder
-              laminateCode={laminateCode}
-              onLaminateCodeChange={setLaminateCode}
-              materialId={laminateMaterialId}
-              onMaterialIdChange={setLaminateMaterialId}
-            />
-          </div>
-        )}
-
-        {/* Design Explorer tab */}
+        {/* Explorer tab — parameter sweeps, Monte Carlo, sensitivity */}
         {activeTab === "explorer" && (
           <div className="h-full px-4 py-3">
             <DesignExplorer
@@ -486,24 +440,6 @@ function AppInner() {
               layupRotation={layupRotation}
               defects={defects}
               modelsReady={modelsReady}
-            />
-          </div>
-        )}
-
-        {/* Project Manager tab */}
-        {activeTab === "project" && (
-          <div className="h-full px-4 py-3">
-            <ProjectManager
-              nDefects={nDefects}
-              pressureX={pressureX}
-              pressureY={pressureY}
-              plyThickness={plyThickness}
-              layupRotation={layupRotation}
-              defects={defects}
-              results={results}
-              onRestoreSnapshot={handleRestoreSnapshot}
-              compareSnapshots={compareSnapshots}
-              onToggleCompare={handleToggleCompare}
             />
           </div>
         )}
