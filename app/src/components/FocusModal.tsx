@@ -26,6 +26,9 @@ export function FocusModal({ open, onClose, children, title }: Props) {
     <div
       ref={backdropRef}
       className="fixed inset-0 z-[60] flex items-center justify-center focus-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title || "Modal"}
       style={{
         background: "rgba(0, 0, 0, 0.6)",
         backdropFilter: "blur(8px)",
@@ -66,6 +69,7 @@ export function FocusModal({ open, onClose, children, title }: Props) {
             className="ml-auto w-7 h-7 flex items-center justify-center rounded-md btn-press"
             style={{ color: COL.textDim, border: `1px solid ${COL.border}` }}
             onClick={onClose}
+            aria-label="Close modal"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />

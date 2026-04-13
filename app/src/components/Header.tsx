@@ -34,7 +34,8 @@ export function Header({ status, modelsReady, predicting, onPreset, onExport, ha
 
       <div className="ml-auto flex items-center gap-2">
         <select
-          className="text-[11px] px-2.5 py-1 rounded-md cursor-pointer outline-none transition-colors"
+          aria-label="Load a preset scenario"
+          className="text-[11px] px-2.5 py-1 rounded-md cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500"
           style={{
             background: COL.panel,
             border: `1px solid ${COL.border}`,
@@ -58,6 +59,7 @@ export function Header({ status, modelsReady, predicting, onPreset, onExport, ha
               color: COL.textMid,
             }}
             onClick={onExport}
+            aria-label="Copy results to clipboard"
             data-tooltip="Copy results to clipboard"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -77,6 +79,7 @@ export function Header({ status, modelsReady, predicting, onPreset, onExport, ha
             background: "transparent",
           }}
           onClick={onReset}
+          aria-label="Reset all inputs"
           data-tooltip="Reset all inputs"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

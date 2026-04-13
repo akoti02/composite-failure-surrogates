@@ -41,6 +41,19 @@ input[type="number"]:focus-visible {
 
 .selectable { user-select: text; }
 
+/* ── Global focus-visible for keyboard navigation ── */
+button:focus-visible,
+select:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Pass/Fail with icons (accessibility: not colour-only) ── */
+.verdict-pass::before { content: "✓ "; }
+.verdict-fail::before { content: "✗ "; }
+
 /* ── Tooltips (glass style) ── */
 [data-tooltip] { position: relative; }
 [data-tooltip]:hover::after {
