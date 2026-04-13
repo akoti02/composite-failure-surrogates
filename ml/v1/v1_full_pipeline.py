@@ -56,7 +56,7 @@ torch.manual_seed(RANDOM_SEED)
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 DATA_PATH = '/mnt/user-data/uploads/simulation_results_100_samples_steel_plate_with_hole.csv'
-OUTPUT_DIR = '/home/claude/figures'
+OUTPUT_DIR = '/home/user/figures'
 YIELD_STRENGTH = 250.0
 K_FOLDS = 5
 TEST_SIZE = 0.2

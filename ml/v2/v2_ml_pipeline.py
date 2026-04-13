@@ -60,7 +60,7 @@ torch.manual_seed(RANDOM_SEED)
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 DATA_PATH = '/mnt/user-data/uploads/simulation_results_v2.csv'
-OUTPUT_DIR = '/home/claude/v2_figures'
+OUTPUT_DIR = '/home/user/v2_figures'
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # V2 feature and target definitions

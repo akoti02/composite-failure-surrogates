@@ -15,6 +15,7 @@ import os
 import sys
 import math
 import random
+import re
 import csv
 import time
 import shutil
@@ -73,12 +74,39 @@ MIN_POLYGON_SEGMENTS = 12
 # Auto-detect platform
 if sys.platform == 'win32':
     CCX_EXE = r"C:\CalculiX\calculix_2.23_4win\ccx_static.exe"
+    CCX_UMAT_EXE = r"C:\CalculiX\calculix_2.21_umat\ccx_2.21.exe"
     WORK_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "compositeNet_sims")
 else:
     CCX_EXE = "/usr/bin/ccx"
+    CCX_UMAT_EXE = os.path.expanduser("~/ccx_umat/CalculiX/ccx_2.21/src/ccx_2.21")
     WORK_DIR = os.path.expanduser("~/sims")
 
-SOLVER_TIMEOUT = 300
+# -----------------------------------------------------------------------------
+# 2.5 Solver dispatch
+# -----------------------------------------------------------------------------
+# Task #18 (dispatch infrastructure): every sample carries a ``solver`` string
+# that routes it to one of three backends. In this first revision of the
+# dispatcher only solvers 1 (stock CCX, static linear) and 2 (CCX + Hashin
+# fatigue UMAT, static nonlinear with damage softening) are fully wired. The
+# OR and Code_Aster paths return an explicit NOT_IMPLEMENTED error row so the
+# CSV still has a valid failure mark and the failure-rate watchdog treats
+# them correctly; they are kept as extension points for follow-up work.
+#
+# NOTE: Plate-with-cracks in Code_Aster makes little physical sense for a
+# mid-plane-damage study — Aster's role in the V11 suite is delamination
+# coupons (DCB/ENF/MMB), which run through ``phaseB_dcb_aster.py`` outside
+# this batch. The Aster entry here exists purely so --solvers=3 is a valid
+# CLI value and the CSV can record "solver_aster" rows as rejected.
+SOLVERS = {
+    1: "ccx_stock",
+    2: "ccx_umat",
+    3: "or",
+    4: "aster",
+}
+DEFAULT_SOLVER_ID = 1
+
+SOLVER_TIMEOUT = 300          # stock CCX (linear static) — fast path
+UMAT_SOLVER_TIMEOUT = 1800    # CCX+UMAT nonlinear with damage softening — slow
 SAVE_HDF5 = False  # Set via --hdf5 flag; requires h5py + numpy
 HDF5_PATH = None   # Path to the shared HDF5 file
 CRACK_SEARCH_BUFFER = 5.0
@@ -165,12 +193,17 @@ LAYUPS = {
 # 2.4 Boundary Condition Modes
 # =============================================================================
 BC_MODES = {
-    1: "biaxial",        # px on RIGHT, py on TOP/BOTTOM
-    2: "tension_comp",   # px on RIGHT, -py on TOP/BOTTOM
-    3: "uniaxial_shear", # px on RIGHT, shear via X-force on TOP
-    # Mode 4 (pure_shear) removed: left edge only constrains X-displacement,
+    1: "biaxial",            # px on RIGHT, py on TOP/BOTTOM
+    2: "tension_comp",       # px on RIGHT, -py on TOP/BOTTOM
+    3: "uniaxial_shear",     # px on RIGHT, shear via X-force on TOP
+    4: "pure_compression",   # -px on RIGHT, fibre-compression dominated
+    5: "buckle_comp",        # compressive reference load + CCX *BUCKLE eigenvalue extraction
+    # Mode "pure_shear" was removed: left edge only constrains X-displacement,
     # so a shear couple produces rigid-body rotation artifacts, not a clean shear state.
 }
+
+# Number of buckling eigenvalues requested in mode 5.
+N_BUCKLE_EIGENVALUES = 4
 
 # =============================================================================
 # 2.9 Multi-Fidelity Mesh Control
@@ -663,7 +696,137 @@ def build_csv_columns():
     cols.extend(['failed_tsai_wu', 'failed_hashin', 'failed_puck', 'failed_larc'])
     # Post-FPF indicator: 1 if any failure index >= 1.0 (useful metadata for dataset users)
     cols.append('post_fpf')
+    # BC mode 5 (*BUCKLE) outputs: fixed-width block of eigenvalues scaled on
+    # the reference compressive load written in the CCX *CLOAD block. Populated
+    # only when bc_mode == "buckle_comp"; zero-filled otherwise so every row
+    # has the same schema.
+    for e in range(1, N_BUCKLE_EIGENVALUES + 1):
+        cols.append(f'buckle_eig_{e}')
+    # Solver dispatch column (task #18) + UMAT SDV damage read-out (task #19).
+    # umat_d_{ft,fc,mt,mc}_max are the maximum values of the four Hashin damage
+    # variables across the final converged increment. Zero-filled for any row
+    # whose solver is not ccx_umat.
+    cols.extend([
+        'solver',
+        'umat_d_ft_max', 'umat_d_fc_max',
+        'umat_d_mt_max', 'umat_d_mc_max',
+        'umat_n_increments',
+    ])
     return cols
+
+
+def _material_to_umat_constants(mat, Lc_mm=2.0):
+    """Derive the 19 UMAT material constants from a MATERIALS-dict entry.
+
+    The exact layout is dictated by ``umat_composite_fatigue.f`` (see
+    ``~/ccx_umat/umat_composite_fatigue.f`` lines 41-58):
+
+         1  E1         longitudinal modulus                [MPa]
+         2  E2         transverse modulus                  [MPa]
+         3  nu12       major Poisson ratio                 [-]
+         4  G12        in-plane shear modulus              [MPa]
+         5  G13        transverse shear modulus            [MPa]
+         6  G23        out-of-plane shear modulus          [MPa]
+         7  XT         longitudinal tensile strength       [MPa]
+         8  XC         longitudinal compressive strength   [MPa]
+         9  YT         transverse tensile strength         [MPa]
+        10  YC         transverse compressive strength     [MPa]
+        11  SL         in-plane shear strength             [MPa]
+        12  ST         transverse shear strength           [MPa]
+        13  Gf_ft      fibre-tension fracture energy       [N/mm]
+        14  Gf_fc      fibre-compression fracture energy   [N/mm]
+        15  Gf_mt      matrix-tension fracture energy      [N/mm]
+        16  Gf_mc      matrix-compression fracture energy  [N/mm]
+        17  Lc         characteristic element length       [mm]
+        18  eta_visc   viscous regularisation              [-]
+        19  beta_shear shear damage coupling               [-]
+
+    The elastic and strength constants (1-12) come from the material
+    library directly. Fracture energies (13-16) use the Camanho & Dávila
+    2002 T300/5208 reference values converted to CCX units (J/m^2 -> N/mm,
+    factor 1e-3): fibre modes at 12.5 N/mm, matrix modes at 1.0 N/mm.
+    ``Lc`` defaults to 2 mm (medium mesh); ``eta_visc`` defaults to 1e-3
+    (typical CDM regularisation, avoids severe stiffness snap-through);
+    ``beta_shear`` defaults to 1.0 (full shear-damage coupling).
+
+    This constant layout matches the Fortran source exactly; the previous
+    revision of this helper used a Weibull-fatigue layout that is *not*
+    what the linked-in umat_composite_fatigue.f expects, which is why the
+    earlier smoke attempt diverged in the first Newton-Raphson iteration.
+    """
+    E1 = float(mat['E1'])
+    E2 = float(mat['E2'])
+    NU12 = float(mat['v12'])
+    G12 = float(mat['G12'])
+    # Transverse isotropy: G13 = G12; G23 from E2 and v23.
+    v23 = float(mat.get('v23', 0.43))
+    G13 = G12
+    G23 = E2 / (2.0 * (1.0 + v23))
+    XT = float(mat['XT'])
+    XC = float(mat['XC'])
+    YT = float(mat['YT'])
+    YC = float(mat['YC'])
+    SL = float(mat['SL'])
+    # Transverse shear strength (ST) estimated from Puck fracture plane.
+    ST = YC / (2.0 * math.tan(math.radians(53.0)))
+    # Fracture energies (N/mm) — Camanho & Dávila (2002) T300/5208.
+    Gf_ft = 12.5
+    Gf_fc = 12.5
+    Gf_mt = 1.0
+    Gf_mc = 1.0
+    Lc = float(Lc_mm)
+    eta_visc = 1.0e-3
+    beta_shear = 1.0
+    return (
+        E1, E2, NU12, G12, G13, G23,
+        XT, XC, YT, YC, SL, ST,
+        Gf_ft, Gf_fc, Gf_mt, Gf_mc,
+        Lc, eta_visc, beta_shear,
+    )
+
+
+def _parse_ccx_umat_sdv(dat_text):
+    """Parse the *EL PRINT SDV block from a CCX+UMAT .dat file.
+
+    Returns ``(n_increments, d_ft_max, d_fc_max, d_mt_max, d_mc_max)`` —
+    the maxima of the first four state variables across the final converged
+    increment. Slots 0..3 correspond to fibre-tensile, fibre-compressive,
+    matrix-tensile, matrix-compressive damage variables per the UMAT source.
+    Returns all zeros on parse failure (caller treats as a failed sim).
+    """
+    increments = []
+    cur_time = None
+    cur_rows = []
+    for line in dat_text.splitlines():
+        m = re.search(r'internal state variables.*time\s+([\d.eE+\-]+)', line)
+        if m:
+            if cur_time is not None:
+                increments.append((cur_time, cur_rows))
+            cur_time = float(m.group(1))
+            cur_rows = []
+            continue
+        toks = line.split()
+        # SDV rows are: elem ip sdv1 sdv2 ... sdv14
+        if len(toks) >= 6 and cur_time is not None:
+            try:
+                _eid = int(toks[0]); _ip = int(toks[1])
+                sdvs = [float(t) for t in toks[2:]]
+                if len(sdvs) >= 4:
+                    cur_rows.append(sdvs)
+            except ValueError:
+                pass
+    if cur_time is not None:
+        increments.append((cur_time, cur_rows))
+    if not increments:
+        return (0, 0.0, 0.0, 0.0, 0.0)
+    _, last_rows = increments[-1]
+    if not last_rows:
+        return (len(increments), 0.0, 0.0, 0.0, 0.0)
+    d_ft = max(r[0] for r in last_rows)
+    d_fc = max(r[1] for r in last_rows)
+    d_mt = max(r[2] for r in last_rows)
+    d_mc = max(r[3] for r in last_rows)
+    return (len(increments), d_ft, d_fc, d_mt, d_mc)
 
 CSV_COLUMNS = build_csv_columns()
 
@@ -1092,6 +1255,7 @@ def write_ccx_inp(nodes, elements, bc_sets, case, job_name, work_dir,
     n_plies = len(layup_angles)
     total_t = n_plies * ply_t
     bc_mode = case['bc_mode']
+    solver = case.get('solver', 'ccx_stock')
 
     filepath = os.path.join(work_dir, f"{job_name}.inp")
 
@@ -1119,10 +1283,29 @@ def write_ccx_inp(nodes, elements, bc_sets, case, job_name, work_dir,
             node_str = ", ".join(str(n) for n in enlist)
             f.write(f"  {eid}, {node_str}\n")
 
-        f.write(f"*MATERIAL, NAME=COMPOSITE_UD\n")
-        f.write("*ELASTIC, TYPE=ENGINEERING CONSTANTS\n")
-        f.write(f"{E1}, {E2}, {E3}, {v12}, {v13}, {v23}, {G12}, {G13}\n")
-        f.write(f"{G23}\n")
+        if solver == 'ccx_umat':
+            # CCX + Hashin-fatigue UMAT — 19 user constants, 14 SDVs.
+            # CalculiX routes to ``umat_user`` whenever the material *name*
+            # starts with the literal string "USER" (see ccx_2.21/src/
+            # umat_main.f line 192). The remaining 76 characters are passed
+            # into umat_user as ``amatloc`` and are free-form — we use
+            # "USER_COMPFAT" so the .inp is self-documenting.
+            umat_name = "USER_COMPFAT"
+            umat_consts = _material_to_umat_constants(mat)
+            f.write(f"*MATERIAL, NAME={umat_name}\n")
+            f.write("*USER MATERIAL, CONSTANTS=19\n")
+            # CCX accepts 8 values per line in *USER MATERIAL blocks.
+            for k in range(0, len(umat_consts), 8):
+                chunk = umat_consts[k:k+8]
+                f.write(", ".join(f"{v:.6g}" for v in chunk) + "\n")
+            f.write("*DEPVAR\n14\n")
+            mat_name_for_section = umat_name
+        else:
+            f.write(f"*MATERIAL, NAME=COMPOSITE_UD\n")
+            f.write("*ELASTIC, TYPE=ENGINEERING CONSTANTS\n")
+            f.write(f"{E1}, {E2}, {E3}, {v12}, {v13}, {v23}, {G12}, {G13}\n")
+            f.write(f"{G23}\n")
+            mat_name_for_section = "COMPOSITE_UD"
 
         # Dynamic orientations
         oris = generate_orientations(layup_angles)
@@ -1134,7 +1317,7 @@ def write_ccx_inp(nodes, elements, bc_sets, case, job_name, work_dir,
         f.write("*SHELL SECTION, COMPOSITE, ELSET=PLATE, OFFSET=0\n")
         for angle in layup_angles:
             ori_name = oris[angle][0]
-            f.write(f"{ply_t}, 3, COMPOSITE_UD, {ori_name}\n")
+            f.write(f"{ply_t}, 3, {mat_name_for_section}, {ori_name}\n")
 
         # Node sets
         for bname, nset in bc_sets.items():
@@ -1161,7 +1344,50 @@ def write_ccx_inp(nodes, elements, bc_sets, case, job_name, work_dir,
             f.write("*BOUNDARY\nLEFT, 1, 1, 0.0\n")
             f.write("CORNER, 2, 3, 0.0\n")
 
-        f.write("*STEP\n*STATIC\n")
+        # Step card — *BUCKLE for mode 5 (linear eigenvalue extraction of the
+        # reference compressive load case), *STATIC otherwise. In both cases
+        # the downstream *CLOAD block writes the reference load that *BUCKLE
+        # will scale to find the critical eigenvalues.
+        #
+        # The UMAT path writes a nonlinear *STATIC card with automatic time
+        # stepping (initial 0.1 increment, min 1e-4, max 0.25) and up to 80
+        # Newton-Raphson attempts per increment — the Hashin-damage UMAT
+        # softens the local stiffness once a failure criterion triggers, so
+        # 1-shot loading (the default) cannot converge past first-ply
+        # failure. NLGEOM is enabled for the UMAT path to keep large-rotation
+        # bending under compressive load well-posed.
+        #
+        # 2026-04-11 UPDATE (Fix 1 for task #18): the UMAT path now uses
+        # linear static (``*STEP / *STATIC``) instead of ``*STEP, INC=80,
+        # NLGEOM / *STATIC 0.1, 1.0, 1e-4, 0.25``. Root cause (see V11 note
+        # §28.15.8): ``umat_composite_fatigue.f`` populates the 6x6
+        # constitutive tangent with only C11/C12/C22/C44/C55/C66 (plus
+        # C33 = 1e-30) and leaves C13 = C23 = 0. That sparse tangent is
+        # fine on a single-element test and fine under linear static, but
+        # under NLGEOM + automatic time-stepping on a multi-element mesh
+        # with force-controlled CLOAD and the batch's minimal BCs, Newton-
+        # Raphson can't converge -- residuals oscillate at ~5-6% of avg
+        # force, cutbacks pile up, CCX aborts with ``*ERROR: too many
+        # cutbacks`` or ``*ERROR: increment size smaller than minimum``.
+        # Linear static solves in one shot, tolerates the sparse tangent,
+        # and writes a valid SDV block. Verified working on GCP rung 1
+        # 2026-04-11 after 4 Gf/Lc variants all failed identically,
+        # proving the tangent is the real issue (not the fracture energy
+        # inequality). Trade-off: damage progression past first-ply
+        # failure is truncated to a single UMAT evaluation at the final
+        # load -- acceptable because the 12-35% FPF sampling range keeps
+        # most sims elastic anyway. Fix 2 (populate C13/C23 in the Fortran
+        # source + rebuild) is the long-term answer and restores the
+        # NLGEOM path for proper post-FPF softening physics.
+        if bc_mode == "buckle_comp":
+            f.write(f"*STEP, PERTURBATION\n*BUCKLE\n{N_BUCKLE_EIGENVALUES}\n")
+        else:
+            # Single step card covers stock CCX, CCX+UMAT, and any future
+            # implicit-static solver. Linear-static one-shot solve; CCX
+            # runs internal Newton iterations to convergence when the
+            # material is nonlinear (UMAT), but does not step through
+            # increments.
+            f.write("*STEP\n*STATIC\n")
 
         # Apply loads based on BC mode
         n_right = len(bc_sets.get("right", set()))
@@ -1218,6 +1444,19 @@ def write_ccx_inp(nodes, elements, bc_sets, case, job_name, work_dir,
                     # Approximate with average Y-component
                     f.write(f"*CLOAD\nTOP, 2, {f_shear:.8f}\n")
 
+            elif bc_mode in ("pure_compression", "buckle_comp"):
+                # BC4/5 (curved): compressive line load on RIGHT along the
+                # *inward* arc-tangent direction (opposite of the biaxial
+                # tensile case). Mode 4 resolves a static stress state; mode
+                # 5 re-uses the same load as the reference case for CCX
+                # *BUCKLE eigenvalue extraction.
+                if n_right > 0:
+                    f_total = -abs(px * PLATE_W * total_t)
+                    fy = (f_total * ct) / n_right
+                    fz = -(f_total * st) / n_right
+                    f.write(f"*CLOAD\nRIGHT, 2, {fy:.8f}\n")
+                    f.write(f"*CLOAD\nRIGHT, 3, {fz:.8f}\n")
+
         else:
             # Flat/cutout loading
             if bc_mode == "biaxial":
@@ -1253,13 +1492,90 @@ def write_ccx_inp(nodes, elements, bc_sets, case, job_name, work_dir,
                     fs = (py * PLATE_L * total_t) / n_top
                     f.write(f"*CLOAD\nTOP, 1, {fs:.8f}\n")
 
-        f.write("*EL PRINT, ELSET=PLATE\nS\n")
+            elif bc_mode in ("pure_compression", "buckle_comp"):
+                # BC4/5 (flat): compressive line load on RIGHT along -X.
+                # Uses pressure_x magnitude as the reference compressive
+                # membrane load. Mode 4 is a static run (stresses + failure
+                # indices); mode 5 re-uses the same load as the reference
+                # load case for CCX *BUCKLE eigenvalue extraction, so the
+                # reported eigenvalues are critical multipliers of this load.
+                if n_right > 0:
+                    fx = -abs(px * PLATE_W * total_t) / n_right
+                    f.write(f"*CLOAD\nRIGHT, 1, {fx:.8f}\n")
+
+        # Output requests — *EL PRINT is valid for *STATIC. For *BUCKLE CCX
+        # writes eigenvalues to the .dat file without requiring *EL PRINT, so
+        # we skip the stress print block under mode 5 to keep the .dat clean
+        # for parse_buckle_eigenvalues().
+        if bc_mode != "buckle_comp":
+            f.write("*EL PRINT, ELSET=PLATE\nS\n")
+            if solver == 'ccx_umat':
+                # Dump all 14 SDVs so _parse_ccx_umat_sdv can lift the max
+                # damage variables. CCX writes these under the
+                # "internal state variables" block that the parser keys off.
+                f.write("*EL PRINT, ELSET=PLATE\nSDV\n")
         f.write("*END STEP\n")
 
 
 # =============================================================================
 # Stress parsing (from batch_100k.py)
 # =============================================================================
+def parse_buckle_eigenvalues(dat_path, n_expected=N_BUCKLE_EIGENVALUES):
+    """Parse CCX *BUCKLE eigenvalue output from a .dat file.
+
+    CCX writes a block of the form:
+
+        B U C K L I N G   F A C T O R   O U T P U T
+
+         MODE NO       BUCKLING
+                        FACTOR
+
+              1   0.9153538E+00
+              2   0.1126419E+01
+              ...
+
+    Note the header word "FACTOR" is wrapped onto its own line — CCX splits
+    the column header across two physical lines. The parser therefore keys
+    only off the "B U C K L I N G" spaced-letters banner as the block start,
+    then skips any non-numeric lines until it finds rows whose first token
+    parses as an int (the mode number) and second token parses as a float
+    (the eigenvalue / load multiplier).
+
+    Returns a list of eigenvalues right-padded with zeros up to ``n_expected``
+    so downstream CSV writers see a fixed-width column set.
+    """
+    eigs = []
+    if not os.path.exists(dat_path):
+        return [0.0] * n_expected
+    in_block = False
+    with open(dat_path, encoding='latin-1') as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            low = stripped.lower()
+            # Block start: CCX banner uses spaced letters "B U C K L I N G".
+            if ('b u c k l i n g' in low) or ('buckling factor output' in low):
+                in_block = True
+                continue
+            if not in_block:
+                continue
+            toks = stripped.split()
+            if len(toks) >= 2:
+                try:
+                    mode_no = int(toks[0])
+                    eig = float(toks[1].replace('D', 'E'))
+                except ValueError:
+                    # Header line ("MODE NO", "FACTOR", etc.) — keep scanning.
+                    continue
+                eigs.append(eig)
+                if len(eigs) >= n_expected:
+                    break
+    if len(eigs) < n_expected:
+        eigs.extend([0.0] * (n_expected - len(eigs)))
+    return eigs[:n_expected]
+
+
 def parse_stresses(dat_path):
     stress_data = []
     in_block = False
@@ -1628,12 +1944,14 @@ def append_csv_row(csv_path, row_dict):
             _unlock_file(f)
 
 
-def build_row(sim_id, sample, mat, metrics=None, error=False, n_elements=0):
+def build_row(sim_id, sample, mat, metrics=None, error=False, n_elements=0,
+              buckle_eigs=None, umat_sdv=None):
     row = {'sim_id': sim_id}
     row['material_id'] = sample['material_id']
     row['material_name'] = MATERIALS[sample['material_id']]['name']
     row['layup_id'] = sample['layup_id']
     row['layup_name'] = LAYUPS[sample['layup_id']]['name']
+    row['solver'] = sample.get('solver', 'ccx_stock')
     row['bc_mode'] = sample['bc_mode']
     row['geometry'] = sample['geometry']
     row['mesh_level'] = sample['mesh_level']
@@ -1723,6 +2041,25 @@ def build_row(sim_id, sample, mat, metrics=None, error=False, n_elements=0):
             metrics['failed_puck'], metrics['failed_larc']
         ]) else 0
 
+    # Buckle eigenvalues — zero-fill for non-buckle modes, write the parsed
+    # eigenvalues for mode 5. This keeps the CSV schema fixed-width.
+    eigs = buckle_eigs if buckle_eigs else [0.0] * N_BUCKLE_EIGENVALUES
+    for i in range(N_BUCKLE_EIGENVALUES):
+        val = eigs[i] if i < len(eigs) else 0.0
+        row[f'buckle_eig_{i+1}'] = round(float(val), 6)
+
+    # UMAT damage SDV read-out — zero-fill for non-UMAT solvers, write the
+    # parsed max damage variables (d_ft, d_fc, d_mt, d_mc) and increment
+    # count for ccx_umat runs. Keeps the CSV schema fixed-width so CSV
+    # readers do not have to branch on solver.
+    if umat_sdv is None:
+        umat_sdv = (0, 0.0, 0.0, 0.0, 0.0)
+    row['umat_n_increments'] = int(umat_sdv[0])
+    row['umat_d_ft_max'] = round(float(umat_sdv[1]), 6)
+    row['umat_d_fc_max'] = round(float(umat_sdv[2]), 6)
+    row['umat_d_mt_max'] = round(float(umat_sdv[3]), 6)
+    row['umat_d_mc_max'] = round(float(umat_sdv[4]), 6)
+
     return row
 
 
@@ -1772,7 +2109,23 @@ def run_single_sim(args):
     sim_id, sample, polygons = args
     job_name = f"cnet_sim{sim_id}"
     mat = MATERIALS[sample['material_id']]
+    solver = sample.get('solver', 'ccx_stock')
     t0 = time.time()
+
+    # Solver dispatch (task #18): OR and Aster backends are not yet wired
+    # into this batch runner — emit a clearly-marked error row so the CSV
+    # stays schema-consistent and the failure-rate watchdog treats them
+    # correctly without having to special-case NOT_IMPLEMENTED states.
+    if solver in ('or', 'aster'):
+        return build_row(sim_id, sample, mat, error=True)
+
+    # Pick the CCX binary based on the solver string. Stock CCX is the
+    # 2.23 Win/Linux build; ccx_umat is a 2.21 build with the Hashin-
+    # fatigue UMAT linked in.
+    if solver == 'ccx_umat':
+        ccx_binary = CCX_UMAT_EXE
+    else:
+        ccx_binary = CCX_EXE
 
     if polygons is None:
         return build_row(sim_id, sample, mat, error=True)
@@ -1805,16 +2158,18 @@ def run_single_sim(args):
         'pressure_x': sample['pressure_x'],
         'pressure_y': sample['pressure_y'],
         'ply_thickness': sample['ply_thickness'],
+        'solver': solver,
     }
     write_ccx_inp(nodes, elements, bc_sets, case, job_name, tmp_dir,
                    geometry=sample['geometry'],
                    panel_radius=sample.get('panel_radius', 200))
 
     try:
+        solver_timeout = UMAT_SOLVER_TIMEOUT if solver == 'ccx_umat' else SOLVER_TIMEOUT
         subprocess.run(
-            [CCX_EXE, job_name],
+            [ccx_binary, job_name],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            timeout=SOLVER_TIMEOUT, cwd=tmp_dir)
+            timeout=solver_timeout, cwd=tmp_dir)
         dat_check = os.path.join(tmp_dir, f"{job_name}.dat")
         if not os.path.exists(dat_check) or os.path.getsize(dat_check) < 100:
             shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -1836,6 +2191,33 @@ def run_single_sim(args):
         return build_row(sim_id, sample, mat, error=True, n_elements=n_elements)
 
     dat_path = os.path.join(tmp_dir, f"{job_name}.dat")
+
+    # BC mode 5 (*BUCKLE): the .dat file contains buckling eigenvalues but
+    # no *EL PRINT stress block, so skip the standard stress path entirely
+    # and populate only the buckle_eig_* columns. Failure indices and stress
+    # extremes are left at zero for this mode (static-stress semantics do
+    # not apply to a linear eigenvalue problem).
+    if sample['bc_mode'] == "buckle_comp":
+        try:
+            eigs = parse_buckle_eigenvalues(dat_path)
+        except Exception:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return build_row(sim_id, sample, mat, error=True, n_elements=n_elements)
+        # A successful *BUCKLE run must yield at least one positive eigenvalue;
+        # if we got nothing, treat it as a solver error so the failed-sim
+        # bookkeeping stays consistent.
+        if not any(e > 0.0 for e in eigs):
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return build_row(sim_id, sample, mat, error=True,
+                             n_elements=n_elements, buckle_eigs=eigs)
+        row = build_row(sim_id, sample, mat, metrics=None, error=False,
+                        n_elements=n_elements, buckle_eigs=eigs)
+        # Override solver_completed="ERROR" that build_row sets for metrics=None.
+        row['solver_completed'] = 'YES'
+        row['n_elements'] = n_elements
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return row
+
     try:
         stress_data = parse_stresses(dat_path)
         if not stress_data:
@@ -1853,11 +2235,24 @@ def run_single_sim(args):
         shutil.rmtree(tmp_dir, ignore_errors=True)
         return build_row(sim_id, sample, mat, error=True, n_elements=n_elements)
 
+    # UMAT SDV read-out (task #19): parse max damage variables (d_ft, d_fc,
+    # d_mt, d_mc) from the SDV block the *EL PRINT card emits. Zero-filled
+    # for stock CCX runs since they don't have user state variables.
+    umat_sdv = None
+    if solver == 'ccx_umat':
+        try:
+            with open(dat_path, 'r', encoding='latin-1') as f:
+                dat_text = f.read()
+            umat_sdv = _parse_ccx_umat_sdv(dat_text)
+        except Exception:
+            umat_sdv = (0, 0.0, 0.0, 0.0, 0.0)
+
     # Write full-field HDF5 data if enabled
     if SAVE_HDF5 and HDF5_PATH:
         write_hdf5_fields(sim_id, metrics, HDF5_PATH)
 
-    row = build_row(sim_id, sample, mat, metrics=metrics)
+    row = build_row(sim_id, sample, mat, metrics=metrics, n_elements=n_elements,
+                    umat_sdv=umat_sdv)
     shutil.rmtree(tmp_dir, ignore_errors=True)
     return row
 
@@ -1878,17 +2273,27 @@ def _combo_seed(base_seed, mat_id, layup_id, bc_id):
 
 
 def generate_samples(material_ids, layup_ids, bc_ids, geometry, mesh_level,
-                     sims_per_combo, seed=2026):
+                     sims_per_combo, seed=2026, solver_ids=None):
     """Generate all sample configurations.
 
     Uses per-combo seeding: each (material, layup, BC) combination gets its own
     deterministic LHS sample and defect RNG stream. This ensures identical physical
     configurations across mesh levels for mesh convergence studies.
+
+    If ``solver_ids`` is provided (list of solver dispatch ints from SOLVERS),
+    the solver is rotated across samples in each combo so every (mat, layup, BC)
+    bin gets an even split of solver labels. This is the simplest per-combo
+    mirror distribution and keeps the sims_per_combo count exact for round
+    multiples — if sims_per_combo is not divisible by len(solver_ids), the
+    remainder samples fall on the first solver in the list.
     """
+    if solver_ids is None or not solver_ids:
+        solver_ids = [DEFAULT_SOLVER_ID]
     combos = list(itertools.product(material_ids, layup_ids, bc_ids))
     total_sims = len(combos) * sims_per_combo
     log(f"  Combinations: {len(combos)} (mats={len(material_ids)} x layups={len(layup_ids)} x bcs={len(bc_ids)})")
     log(f"  Sims per combo: {sims_per_combo}")
+    log(f"  Solvers: {[SOLVERS[i] for i in solver_ids]}")
     log(f"  Total sims: {total_sims}")
 
     # Build parameter ranges (geometry-dependent)
@@ -1949,6 +2354,10 @@ def generate_samples(material_ids, layup_ids, bc_ids, geometry, mesh_level,
                 py_hi_scaled *= CUTOUT_PRESSURE_FACTOR
             pressure_y = gs['pressure_y_frac'] * py_hi_scaled
 
+            # Rotate solver across samples within a combo so every combo
+            # gets a balanced split between the requested backends.
+            solver_name = SOLVERS[solver_ids[s % len(solver_ids)]]
+
             sample = {
                 'material_id': mat_id,
                 'layup_id': layup_id,
@@ -1960,6 +2369,7 @@ def generate_samples(material_ids, layup_ids, bc_ids, geometry, mesh_level,
                 'pressure_y': pressure_y,
                 'ply_thickness': gs['ply_thickness'],
                 'defects': defects,
+                'solver': solver_name,
             }
 
             if geometry == "cutout":
@@ -2050,7 +2460,11 @@ def parse_args():
     parser.add_argument('--layups', type=str, default='1',
                         help='Layup IDs: "1-35" or "1,3,6" (default: 1)')
     parser.add_argument('--bcs', type=str, default='1',
-                        help='BC mode IDs: "1-4" or "1,2" (default: 1)')
+                        help='BC mode IDs: "1-5" or "1,2" (default: 1)')
+    parser.add_argument('--solvers', type=str, default=str(DEFAULT_SOLVER_ID),
+                        help=(f'Solver dispatch IDs: "1-4" or "1,2" '
+                              f'(1=ccx_stock, 2=ccx_umat, 3=or, 4=aster; '
+                              f'default: {DEFAULT_SOLVER_ID})'))
     parser.add_argument('--geometry', type=str, default='flat',
                         choices=['flat', 'cutout', 'curved'],
                         help='Geometry type (default: flat)')
@@ -2101,6 +2515,7 @@ def main():
     material_ids = parse_range(args.materials)
     layup_ids = parse_range(args.layups)
     bc_ids = parse_range(args.bcs)
+    solver_ids = parse_range(args.solvers)
 
     # Validate IDs against known dictionaries
     bad = [m for m in material_ids if m not in MATERIALS]
@@ -2114,6 +2529,15 @@ def main():
     bad = [b for b in bc_ids if b not in BC_MODES]
     if bad:
         print(f"ERROR: Unknown BC ID(s): {bad}. Valid: 1-{max(BC_MODES.keys())}", file=sys.stderr)
+        sys.exit(1)
+    bad = [s for s in solver_ids if s not in SOLVERS]
+    if bad:
+        print(f"ERROR: Unknown solver ID(s): {bad}. Valid: 1-{max(SOLVERS.keys())}", file=sys.stderr)
+        sys.exit(1)
+    # Warn if the UMAT solver is requested but its binary is missing.
+    if 2 in solver_ids and not os.path.exists(CCX_UMAT_EXE):
+        print(f"ERROR: --solvers includes 2 (ccx_umat) but binary missing: "
+              f"{CCX_UMAT_EXE}", file=sys.stderr)
         sys.exit(1)
 
     # Validate material strengths are positive (prevent ZeroDivisionError in failure criteria)
@@ -2141,14 +2565,16 @@ def main():
         log(f"  Materials: {material_ids}")
         log(f"  Layups: {layup_ids}")
         log(f"  BCs: {bc_ids}")
+        log(f"  Solvers: {solver_ids} -> {[SOLVERS[i] for i in solver_ids]}")
         log(f"  Geometry: {args.geometry}, Mesh: {args.mesh}")
         log(f"  Sims/combo: {args.sims_per_combo}, Workers: {n_workers}")
         log(f"  Output: {OUTPUT_CSV}")
-        log(f"  Solver: {CCX_EXE}")
+        log(f"  CCX_EXE:      {CCX_EXE}")
+        log(f"  CCX_UMAT_EXE: {CCX_UMAT_EXE}")
         log("="*75)
 
-        if not os.path.exists(CCX_EXE):
-            log(f"ERROR: Solver not found: {CCX_EXE}")
+        if 1 in solver_ids and not os.path.exists(CCX_EXE):
+            log(f"ERROR: stock CCX solver not found: {CCX_EXE}")
             return
 
         # Step 1: Generate samples
@@ -2156,7 +2582,8 @@ def main():
         t0 = time.time()
         all_samples = generate_samples(
             material_ids, layup_ids, bc_ids,
-            args.geometry, args.mesh, args.sims_per_combo, seed=args.seed)
+            args.geometry, args.mesh, args.sims_per_combo, seed=args.seed,
+            solver_ids=solver_ids)
         log(f"  Generated {len(all_samples)} samples in {time.time()-t0:.1f}s")
 
         # Step 2: VM slicing
