@@ -332,8 +332,8 @@ export function computeStressField(
 
   const [mu1, mu2] = characteristicRoots(mat);
 
-  const nx = resolution;
-  const ny = Math.round(resolution * plateH / plateW);
+  const nx = Math.max(resolution, 2);
+  const ny = Math.max(Math.round(resolution * plateH / plateW), 2);
   const dx = plateW / (nx - 1);
   const dy = plateH / (ny - 1);
 
@@ -353,6 +353,7 @@ export function computeStressField(
       let tauXY = tauXYinf;
 
       // Superpose stress perturbations from each defect
+      let insideAnyDefect = false;
       for (let d = 0; d < nDefects; d++) {
         const def = defects[d];
         if (!def) continue;
@@ -369,10 +370,21 @@ export function computeStressField(
           mu1, mu2,
         );
 
+        // If point is inside this defect (stress = 0,0,0), mark and skip further superposition
+        if (result.sigX === 0 && result.sigY === 0 && result.tauXY === 0) {
+          insideAnyDefect = true;
+          break;
+        }
+
         // Superposition: add perturbation (subtract far-field to avoid double counting)
         sigX += result.sigX - sigXinf;
         sigY += result.sigY - sigYinf;
         tauXY += result.tauXY - tauXYinf;
+      }
+
+      // Point inside a defect: zero stress (void)
+      if (insideAnyDefect) {
+        sigX = 0; sigY = 0; tauXY = 0;
       }
 
       const vm = vonMises(sigX, sigY, tauXY);

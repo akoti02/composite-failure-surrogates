@@ -319,9 +319,10 @@ export function DesignExplorer(props: ExplorerProps) {
     const outputs: Record<string, number[]> = {};
     OUTPUT_FIELDS.forEach(f => { outputs[f.id] = []; });
 
-    for (let i = 0; i <= nSteps; i++) {
+    const safeSteps = Math.max(nSteps, 1);
+    for (let i = 0; i <= safeSteps; i++) {
       if (abortRef.current) break;
-      const t = i / nSteps;
+      const t = i / safeSteps;
       const val = param.min + t * (param.max - param.min);
       values.push(val);
 

@@ -295,7 +295,7 @@ def build_feature_vector(raw: dict, feature_names: list) -> np.ndarray:
             )
             min_dist = min(min_dist, d)
     if len(positions) < 2:
-        min_dist = 0.0
+        min_dist = 0.0  # matches training pipeline: single defect → 0 (zero-padded like defect2..5)
     feats["min_inter_defect_dist"] = min_dist
 
     total_crack_area = 0.0

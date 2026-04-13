@@ -87,7 +87,7 @@ function zeros3(): Mat3 {
 function invertMat3(m: Mat3): Mat3 {
   const [[a, b, c], [d, e, f], [g, h, i]] = m;
   const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
-  if (Math.abs(det) < 1e-20) throw new Error("Singular matrix in CLT");
+  if (Math.abs(det) < 1e-12) throw new Error("Singular matrix in CLT");
   const invDet = 1 / det;
   return [
     [(e * i - f * h) * invDet, (c * h - b * i) * invDet, (b * f - c * e) * invDet],
@@ -550,18 +550,21 @@ export function progressiveFailure(
         // apply general matrix degradation as conservative default
         const noHashinMode = !hasFiber && !hasMatrix;
         // Matrix-dominated failure: degrade E2, G12
-        if (hasMatrix || noHashinMode) {
+        if ((hasMatrix || noHashinMode) && !hasFiber) {
           degraded.E2 *= 0.01;
           degraded.G12 *= 0.01;
           degraded.Yt *= 0.01;
           degraded.Yc *= 0.01;
           degraded.S12 *= 0.01;
         }
-        // Fiber failure: degrade everything
+        // Fiber failure: degrade everything (including E2, G12 — no double degradation)
         if (hasFiber) {
           degraded.E1 *= 0.01;
           degraded.E2 *= 0.01;
           degraded.G12 *= 0.01;
+          degraded.Yt *= 0.01;
+          degraded.Yc *= 0.01;
+          degraded.S12 *= 0.01;
         }
         // Use unique ID for this degraded ply
         const newId = `${matId}_deg_${pr.plyIndex}`;

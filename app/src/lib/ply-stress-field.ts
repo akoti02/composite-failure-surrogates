@@ -190,10 +190,10 @@ export function applyMLScaling(
       return {
         ...pt,
         sigX, sigY, tauXY,
-        vonMises: pt.vonMises * factor,
+        vonMises: pt.vonMises * Math.abs(factor),
         sig1: pt.sig1 * factor,
         sig2: pt.sig2 * factor,
-        maxShear: pt.maxShear * factor,
+        maxShear: pt.maxShear * Math.abs(factor),
         sigma1: s1,
         sigma2: s2,
         tau12: t12,
