@@ -165,11 +165,17 @@ const TABS: { id: AppTab; labelKey: TKey; icon: string }[] = [
  */
 type UpdateState =
   | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "up_to_date" }
   | { kind: "available"; version: string; notes: string; update: UpdateHandle }
   | { kind: "downloading"; pct: number; total: number }
   | { kind: "installing" }
   | { kind: "restarting" }
   | { kind: "failed"; msg: string };
+
+// Custom event Header dispatches when the user clicks "Check for updates".
+// UpdateBanner listens and triggers a fresh check().
+const CHECK_UPDATES_EVENT = "rp3-check-updates";
 
 interface UpdateHandle {
   version: string;
@@ -186,26 +192,46 @@ function UpdateBanner() {
   const [state, setState] = useState<UpdateState>({ kind: "idle" });
   const [dismissed, setDismissed] = useState(false);
 
-  // Check once on mount — silent if no update.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { check } = await import("@tauri-apps/plugin-updater");
-        const update = await check();
-        if (cancelled || !update) return;
-        setState({
-          kind: "available",
-          version: update.version,
-          notes: update.body ?? "",
-          update: update as unknown as UpdateHandle,
-        });
-      } catch {
-        // Not running inside Tauri, offline, or endpoint unreachable — silent.
+  const doCheck = useCallback(async (manual: boolean) => {
+    if (manual) setState({ kind: "checking" });
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (!update) {
+        // No newer version. If the user asked manually, say so briefly;
+        // otherwise stay silent.
+        if (manual) {
+          setState({ kind: "up_to_date" });
+          setTimeout(() => setState(prev => prev.kind === "up_to_date" ? { kind: "idle" } : prev), 3500);
+        }
+        return;
       }
-    })();
-    return () => { cancelled = true; };
+      setDismissed(false);
+      setState({
+        kind: "available",
+        version: update.version,
+        notes: update.body ?? "",
+        update: update as unknown as UpdateHandle,
+      });
+    } catch (e) {
+      if (manual) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setState({ kind: "failed", msg: msg.slice(0, 120) });
+      }
+      // Silent on startup — offline, not inside Tauri, etc.
+    }
   }, []);
+
+  // Automatic check on mount.
+  useEffect(() => { doCheck(false); }, [doCheck]);
+
+  // Manual check via window event (dispatched by the Header "Check for
+  // updates" button).
+  useEffect(() => {
+    const handler = () => doCheck(true);
+    window.addEventListener(CHECK_UPDATES_EVENT, handler);
+    return () => window.removeEventListener(CHECK_UPDATES_EVENT, handler);
+  }, [doCheck]);
 
   const handleInstall = useCallback(async () => {
     if (state.kind !== "available") return;
@@ -239,12 +265,14 @@ function UpdateBanner() {
   if (dismissed && state.kind === "available") return null;
   if (state.kind === "idle") return null;
 
-  // Palette: cyan glow for active states, violet for "available", rose for failure.
+  // Palette: cyan glow for active/info states, violet for "available", rose for failure.
   const palette = state.kind === "failed"
     ? { bg: "rgba(255,94,135,0.12)", border: "rgba(255,94,135,0.35)", text: "#ffd0dc", btn: "#ff5e87", btnText: "#1a0810", glow: "rgba(255,94,135,0.25)" }
     : state.kind === "available"
       ? { bg: "rgba(183,148,255,0.12)", border: "rgba(183,148,255,0.35)", text: "#e0ccff", btn: "#b794ff", btnText: "#1a0a2e", glow: "rgba(183,148,255,0.4)" }
-      : { bg: "rgba(0,234,255,0.10)", border: "rgba(0,234,255,0.32)", text: "#b4f5ff", btn: COL.accent, btnText: "#041017", glow: "rgba(0,234,255,0.4)" };
+      : state.kind === "up_to_date"
+        ? { bg: "rgba(94,255,176,0.10)", border: "rgba(94,255,176,0.32)", text: "#c9ffe4", btn: COL.success, btnText: "#0b1f15", glow: "rgba(94,255,176,0.32)" }
+        : { bg: "rgba(0,234,255,0.10)", border: "rgba(0,234,255,0.32)", text: "#b4f5ff", btn: COL.accent, btnText: "#041017", glow: "rgba(0,234,255,0.4)" };
 
   return (
     <div
@@ -297,6 +325,12 @@ function UpdateBanner() {
         </>
       )}
 
+      {state.kind === "checking" && (
+        <span className="font-semibold">{t("update_checking")}</span>
+      )}
+      {state.kind === "up_to_date" && (
+        <span className="font-semibold">{t("update_up_to_date")}</span>
+      )}
       {state.kind === "installing" && (
         <span className="font-semibold">{t("update_installing")}</span>
       )}
@@ -322,7 +356,7 @@ function UpdateBanner() {
 // Visible app version — shown in footer so users can confirm an update
 // landed. Update this together with Cargo.toml + tauri.conf.json on each
 // version bump (handled by the release workflow's tag).
-const APP_VERSION = "0.3.1";
+const APP_VERSION = "0.3.2";
 
 function AppInner() {
   const t = useT();

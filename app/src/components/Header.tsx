@@ -144,6 +144,23 @@ export function Header({ status, modelsReady, predicting, activePreset, onPreset
           {t("laminate")}
         </button>
 
+        {/* Check for updates — manual trigger (startup auto-check also runs) */}
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-md btn-press"
+          style={{
+            color: COL.textDim,
+            border: `1px solid ${COL.border}`,
+            background: "transparent",
+          }}
+          onClick={() => window.dispatchEvent(new CustomEvent("rp3-check-updates"))}
+          aria-label={t("check_for_updates")}
+          data-tooltip={t("check_for_updates")}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6" />
+          </svg>
+        </button>
+
         {/* Reset icon button */}
         <button
           className="w-8 h-8 flex items-center justify-center rounded-md btn-press"

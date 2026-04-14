@@ -98,8 +98,8 @@ function buildBaseInputs(props: ExplorerProps, overrides: Record<string, number>
   return raw;
 }
 
-/** Simple SVG line chart */
-function LineChart({ data, title, xLabel, yLabel, width = 400, height = 200 }: {
+/** Simple SVG line chart — responsive (fills container via viewBox scaling) */
+function LineChart({ data, title, xLabel, yLabel, width = 800, height = 320 }: {
   data: { x: number[]; y: number[]; color: string; label: string }[];
   title: string;
   xLabel: string;
@@ -107,7 +107,7 @@ function LineChart({ data, title, xLabel, yLabel, width = 400, height = 200 }: {
   width?: number;
   height?: number;
 }) {
-  const mx = 50, my = 24, mb = 30, mr = 20;
+  const mx = 64, my = 30, mb = 40, mr = 30;
   const pw = width - mx - mr;
   const ph = height - my - mb;
 
@@ -121,13 +121,13 @@ function LineChart({ data, title, xLabel, yLabel, width = 400, height = 200 }: {
   const yRange = yMax - yMin || 1;
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <text x={width / 2} y={14} fill={COL.textMid} fontSize={10} textAnchor="middle" fontWeight={600}>{title}</text>
-      <rect x={mx} y={my} width={pw} height={ph} fill="none" stroke="rgba(255,255,255,0.06)" />
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto" }}>
+      <text x={width / 2} y={18} fill={COL.text} fontSize={14} textAnchor="middle" fontWeight={600}>{title}</text>
+      <rect x={mx} y={my} width={pw} height={ph} fill="none" stroke="rgba(255,255,255,0.1)" />
 
       {/* Grid lines */}
       {[0.25, 0.5, 0.75].map(f => (
-        <line key={f} x1={mx} y1={my + ph * (1 - f)} x2={mx + pw} y2={my + ph * (1 - f)} stroke="rgba(255,255,255,0.04)" />
+        <line key={f} x1={mx} y1={my + ph * (1 - f)} x2={mx + pw} y2={my + ph * (1 - f)} stroke="rgba(255,255,255,0.06)" />
       ))}
 
       {data.map((series, si) => {
@@ -136,43 +136,43 @@ function LineChart({ data, title, xLabel, yLabel, width = 400, height = 200 }: {
           const py = my + ph - ((isFinite(series.y[i]) ? series.y[i] : yMin) - yMin) / yRange * ph;
           return `${px.toFixed(1)},${py.toFixed(1)}`;
         }).join(" ");
-        return <polyline key={si} points={points} fill="none" stroke={series.color} strokeWidth={1.5} />;
+        return <polyline key={si} points={points} fill="none" stroke={series.color} strokeWidth={2} style={{ filter: `drop-shadow(0 0 3px ${series.color}66)` }} />;
       })}
 
       {/* Axes */}
-      <text x={width / 2} y={height - 4} fill={COL.textDim} fontSize={9} textAnchor="middle">{xLabel}</text>
-      <text x={10} y={my + ph / 2} fill={COL.textDim} fontSize={9} textAnchor="middle" transform={`rotate(-90, 10, ${my + ph / 2})`}>{yLabel}</text>
+      <text x={width / 2} y={height - 6} fill={COL.textMid} fontSize={12} textAnchor="middle">{xLabel}</text>
+      <text x={16} y={my + ph / 2} fill={COL.textMid} fontSize={12} textAnchor="middle" transform={`rotate(-90, 16, ${my + ph / 2})`}>{yLabel}</text>
 
       {/* Tick labels */}
       {[0, 0.5, 1].map(f => (
-        <text key={`x${f}`} x={mx + pw * f} y={my + ph + 14} fill={COL.textDim} fontSize={8} textAnchor="middle">
+        <text key={`x${f}`} x={mx + pw * f} y={my + ph + 18} fill={COL.textDim} fontSize={11} textAnchor="middle">
           {(xMin + xRange * f).toFixed(1)}
         </text>
       ))}
       {[0, 0.5, 1].map(f => (
-        <text key={`y${f}`} x={mx - 4} y={my + ph * (1 - f) + 3} fill={COL.textDim} fontSize={8} textAnchor="end">
+        <text key={`y${f}`} x={mx - 6} y={my + ph * (1 - f) + 4} fill={COL.textDim} fontSize={11} textAnchor="end">
           {(yMin + yRange * f).toFixed(1)}
         </text>
       ))}
 
       {/* Legend */}
       {data.length > 1 && data.map((s, i) => (
-        <g key={i} transform={`translate(${mx + 8}, ${my + 12 + i * 14})`}>
-          <line x1={0} y1={0} x2={12} y2={0} stroke={s.color} strokeWidth={2} />
-          <text x={16} y={3} fill={COL.textDim} fontSize={8}>{s.label}</text>
+        <g key={i} transform={`translate(${mx + 12}, ${my + 14 + i * 18})`}>
+          <line x1={0} y1={0} x2={16} y2={0} stroke={s.color} strokeWidth={2.5} />
+          <text x={22} y={4} fill={COL.textMid} fontSize={11}>{s.label}</text>
         </g>
       ))}
     </svg>
   );
 }
 
-/** 2D heatmap chart */
-function HeatmapChart({ xValues, yValues, data, title, xLabel, yLabel, width = 360, height = 280 }: {
+/** 2D heatmap chart — responsive */
+function HeatmapChart({ xValues, yValues, data, title, xLabel, yLabel, width = 720, height = 460 }: {
   xValues: number[]; yValues: number[]; data: number[][];
   title: string; xLabel: string; yLabel: string;
   width?: number; height?: number;
 }) {
-  const mx = 50, my = 24, mb = 30, mr = 60;
+  const mx = 64, my = 30, mb = 42, mr = 80;
   const pw = width - mx - mr;
   const ph = height - my - mb;
 
@@ -188,8 +188,8 @@ function HeatmapChart({ xValues, yValues, data, title, xLabel, yLabel, width = 3
   const cellH = ph / ny;
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <text x={width / 2} y={14} fill={COL.textMid} fontSize={10} textAnchor="middle" fontWeight={600}>{title}</text>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto" }}>
+      <text x={width / 2} y={18} fill={COL.text} fontSize={14} textAnchor="middle" fontWeight={600}>{title}</text>
 
       {data.map((row, j) => row.map((val, i) => {
         const [r, g, b] = isFinite(val)
@@ -205,8 +205,8 @@ function HeatmapChart({ xValues, yValues, data, title, xLabel, yLabel, width = 3
         );
       }))}
 
-      <text x={(mx + mx + pw) / 2} y={height - 4} fill={COL.textDim} fontSize={9} textAnchor="middle">{xLabel}</text>
-      <text x={10} y={my + ph / 2} fill={COL.textDim} fontSize={9} textAnchor="middle" transform={`rotate(-90, 10, ${my + ph / 2})`}>{yLabel}</text>
+      <text x={(mx + mx + pw) / 2} y={height - 8} fill={COL.textMid} fontSize={12} textAnchor="middle">{xLabel}</text>
+      <text x={16} y={my + ph / 2} fill={COL.textMid} fontSize={12} textAnchor="middle" transform={`rotate(-90, 16, ${my + ph / 2})`}>{yLabel}</text>
 
       {/* Colorbar */}
       {Array.from({ length: 20 }, (_, i) => {
@@ -214,23 +214,23 @@ function HeatmapChart({ xValues, yValues, data, title, xLabel, yLabel, width = 3
         const val = vMin + t * (vMax - vMin);
         const [r, g, b] = mapColor(val, vMin, vMax, "turbo");
         return (
-          <rect key={i} x={mx + pw + 8} y={my + ph * (1 - t) - ph / 20} width={10} height={ph / 19 + 1}
+          <rect key={i} x={mx + pw + 14} y={my + ph * (1 - t) - ph / 20} width={14} height={ph / 19 + 1}
             fill={`rgb(${r},${g},${b})`} />
         );
       })}
-      <text x={mx + pw + 22} y={my + 6} fill={COL.textDim} fontSize={8}>{vMax.toFixed(1)}</text>
-      <text x={mx + pw + 22} y={my + ph + 4} fill={COL.textDim} fontSize={8}>{vMin.toFixed(1)}</text>
+      <text x={mx + pw + 32} y={my + 8} fill={COL.textMid} fontSize={11}>{vMax.toFixed(1)}</text>
+      <text x={mx + pw + 32} y={my + ph + 4} fill={COL.textMid} fontSize={11}>{vMin.toFixed(1)}</text>
     </svg>
   );
 }
 
-/** Histogram for Monte Carlo */
-function Histogram({ values, title, bins = 30, width = 300, height = 160 }: {
+/** Histogram for Monte Carlo — responsive */
+function Histogram({ values, title, bins = 30, width = 720, height = 260 }: {
   values: number[]; title: string; bins?: number; width?: number; height?: number;
 }) {
   if (values.length === 0) return null;
 
-  const mx = 40, my = 20, mb = 24, mr = 10;
+  const mx = 52, my = 28, mb = 32, mr = 16;
   const pw = width - mx - mr;
   const ph = height - my - mb;
 
@@ -247,44 +247,56 @@ function Histogram({ values, title, bins = 30, width = 300, height = 160 }: {
   const maxCount = Math.max(...counts);
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <text x={width / 2} y={14} fill={COL.textMid} fontSize={10} textAnchor="middle" fontWeight={600}>{title}</text>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto" }}>
+      <text x={width / 2} y={18} fill={COL.text} fontSize={14} textAnchor="middle" fontWeight={600}>{title}</text>
       {counts.map((c, i) => {
         const x = mx + (i / bins) * pw;
         const h = (c / maxCount) * ph;
         return (
           <rect key={i} x={x} y={my + ph - h} width={pw / bins - 0.5} height={h}
-            fill={COL.accent} fillOpacity={0.7} />
+            fill={COL.accent} fillOpacity={0.75}
+            style={{ filter: "drop-shadow(0 0 3px rgba(0,234,255,0.35))" }} />
         );
       })}
-      <rect x={mx} y={my} width={pw} height={ph} fill="none" stroke="rgba(255,255,255,0.06)" />
-      <text x={mx} y={height - 4} fill={COL.textDim} fontSize={8}>{vMin.toFixed(1)}</text>
-      <text x={mx + pw} y={height - 4} fill={COL.textDim} fontSize={8} textAnchor="end">{vMax.toFixed(1)}</text>
+      <rect x={mx} y={my} width={pw} height={ph} fill="none" stroke="rgba(255,255,255,0.1)" />
+      <text x={mx} y={height - 8} fill={COL.textMid} fontSize={11}>{vMin.toFixed(1)}</text>
+      <text x={mx + pw} y={height - 8} fill={COL.textMid} fontSize={11} textAnchor="end">{vMax.toFixed(1)}</text>
     </svg>
   );
 }
 
-/** Sobol sensitivity bar chart */
-function SensitivityBars({ params, indices, title, width = 360, height = 200 }: {
+/** Sobol sensitivity bar chart — responsive, dynamic label margin */
+function SensitivityBars({ params, indices, title, width = 820, height }: {
   params: string[]; indices: number[]; title: string; width?: number; height?: number;
 }) {
-  const mx = 120, my = 20, mb = 10, mr = 40;
+  // Character-width estimate for the label column. Cyrillic is slightly wider than
+  // Latin at most weights but 9-10px avg is a safe approximation at fontSize 12.
+  // Add 24px padding so the label never kisses the bar.
+  const longest = params.reduce((m, p) => Math.max(m, p.length), 0);
+  const mx = Math.max(160, Math.min(360, longest * 10 + 24));
+  const my = 36, mb = 16, mr = 72;
+  const barH = 30;
+  const h = height ?? (my + mb + params.length * barH + 8);
   const pw = width - mx - mr;
-  const ph = height - my - mb;
-  const barH = Math.min(ph / params.length, 20);
+  const ph = h - my - mb;
+  const actualBarH = Math.min(ph / Math.max(params.length, 1), barH);
   const maxIdx = Math.max(...indices, 0.01);
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <text x={width / 2} y={14} fill={COL.textMid} fontSize={10} textAnchor="middle" fontWeight={600}>{title}</text>
+    <svg viewBox={`0 0 ${width} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto" }}>
+      <text x={width / 2} y={22} fill={COL.text} fontSize={14} textAnchor="middle" fontWeight={600}>{title}</text>
       {params.map((p, i) => {
-        const y = my + i * barH;
+        const y = my + i * actualBarH;
         const w = (indices[i] / maxIdx) * pw;
         return (
           <g key={i}>
-            <text x={mx - 4} y={y + barH / 2 + 3} fill={COL.textDim} fontSize={9} textAnchor="end">{p}</text>
-            <rect x={mx} y={y + 2} width={Math.max(w, 1)} height={barH - 4} fill={COL.accent} rx={2} />
-            <text x={mx + w + 4} y={y + barH / 2 + 3} fill={COL.textMid} fontSize={9}>{indices[i].toFixed(3)}</text>
+            <text x={mx - 8} y={y + actualBarH / 2 + 4} fill={COL.textMid} fontSize={12} textAnchor="end">{p}</text>
+            <rect
+              x={mx} y={y + 3} width={Math.max(w, 1)} height={actualBarH - 6}
+              fill={COL.accent} rx={3}
+              style={{ filter: "drop-shadow(0 0 4px rgba(0,234,255,0.4))" }}
+            />
+            <text x={mx + w + 6} y={y + actualBarH / 2 + 4} fill={COL.text} fontSize={12} fontWeight={600}>{indices[i].toFixed(3)}</text>
           </g>
         );
       })}
@@ -724,7 +736,6 @@ export function DesignExplorer(props: ExplorerProps) {
               title={`${outLabel(outputField)} vs ${t(getParamDef(paramX).labelKey)}`}
               xLabel={`${t(getParamDef(paramX).labelKey)} (${paramUnit(getParamDef(paramX))})`}
               yLabel={outLabel(outputField)}
-              width={600} height={280}
             />
 
             <LineChart
@@ -737,7 +748,6 @@ export function DesignExplorer(props: ExplorerProps) {
               title={t("all_outputs")}
               xLabel={`${t(getParamDef(paramX).labelKey)} (${paramUnit(getParamDef(paramX))})`}
               yLabel={t("value")}
-              width={600} height={280}
             />
           </div>
         )}
@@ -750,7 +760,6 @@ export function DesignExplorer(props: ExplorerProps) {
             title={outLabel(outputField)}
             xLabel={`${t(getParamDef(paramX).labelKey)} (${paramUnit(getParamDef(paramX))})`}
             yLabel={`${t(getParamDef(paramY).labelKey)} (${paramUnit(getParamDef(paramY))})`}
-            width={500} height={400}
           />
         )}
 
@@ -759,7 +768,6 @@ export function DesignExplorer(props: ExplorerProps) {
             <Histogram
               values={resultMC.outputs[outputField] ?? []}
               title={`${outLabel(outputField)} — ${t("distribution")} (n=${nSamples})`}
-              width={500} height={200}
             />
 
             <div className="grid grid-cols-3 gap-3">
@@ -788,7 +796,6 @@ export function DesignExplorer(props: ExplorerProps) {
               params={resultSens.params.map(p => t(getParamDef(p).labelKey))}
               indices={resultSens.indices[outputField] ?? []}
               title={`${t("sensitivity_of")}: ${outLabel(outputField)}`}
-              width={500} height={SWEEP_PARAMS.length * 28 + 40}
             />
 
             <div className="text-[11px]" style={{ color: COL.textDim }}>

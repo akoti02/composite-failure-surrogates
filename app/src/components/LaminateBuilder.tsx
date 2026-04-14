@@ -9,7 +9,7 @@ import { useT } from "../lib/i18n";
 
 /** Polar plot of stiffness for laminate visualization */
 function StiffnessPolar({ abd }: { abd: ABDResult }) {
-  const w = 220, h = 220;
+  const w = 260, h = 260;
   const cx = w / 2, cy = h / 2;
   const r = 90;
 
@@ -52,8 +52,8 @@ function StiffnessPolar({ abd }: { abd: ABDResult }) {
       <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="rgba(255,255,255,0.08)" strokeWidth={0.5} />
       <line x1={cx} y1={cy - r} x2={cx} y2={cy + r} stroke="rgba(255,255,255,0.08)" strokeWidth={0.5} />
       {/* Labels */}
-      <text x={cx + r + 4} y={cy + 3} fill={COL.textDim} fontSize={8}>0°</text>
-      <text x={cx - 2} y={cy - r - 4} fill={COL.textDim} fontSize={8} textAnchor="middle">90°</text>
+      <text x={cx + r + 4} y={cy + 4} fill={COL.textMid} fontSize={11}>0°</text>
+      <text x={cx - 2} y={cy - r - 6} fill={COL.textMid} fontSize={11} textAnchor="middle">90°</text>
       {/* Polar curve */}
       <polygon points={points.join(" ")} fill="rgba(99,102,241,0.15)" stroke={COL.accent} strokeWidth={1.5} />
     </svg>
@@ -85,7 +85,7 @@ function PlyStackViz({ plies, materials, results }: {
       <div className="text-[12px] font-semibold mb-1" style={{ color: COL.textMid }}>
         {t("ply_stack")} ({n} {t("plies")}, {(plies.reduce((s, p) => s + (p.thickness ?? materials[p.materialId]?.plyThickness ?? 0.125), 0)).toFixed(2)} {t("unit_mm")})
       </div>
-      <svg width="100%" viewBox={`0 0 ${w} ${totalH + 4}`} style={{ maxWidth: w }}>
+      <svg viewBox={`0 0 ${w} ${totalH + 4}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto" }}>
         {plies.map((ply, i) => {
           const y = 2 + i * plyH;
           const failed = results?.[i]?.failed;
@@ -126,16 +126,16 @@ function PlyStackViz({ plies, materials, results }: {
                 })}
               </g>
               {/* Ply number label */}
-              <text x={barLeft - 4} y={y + plyH / 2} fill={COL.textDim} fontSize={8} textAnchor="end" dominantBaseline="central">
+              <text x={barLeft - 6} y={y + plyH / 2} fill={COL.textMid} fontSize={11} textAnchor="end" dominantBaseline="central">
                 {i + 1}
               </text>
               {/* Angle label */}
-              <text x={barLeft + barW + 4} y={y + plyH / 2} fill={COL.textMid} fontSize={9} textAnchor="start" dominantBaseline="central">
+              <text x={barLeft + barW + 6} y={y + plyH / 2} fill={COL.text} fontSize={12} textAnchor="start" dominantBaseline="central">
                 {ply.angle}°
               </text>
               {/* Failure index in bar center */}
               {fi > 0 && (
-                <text x={barLeft + barW / 2} y={y + plyH / 2} fill={fi >= 1 ? COL.danger : COL.textDim} fontSize={8} textAnchor="middle" dominantBaseline="central">
+                <text x={barLeft + barW / 2} y={y + plyH / 2} fill={fi >= 1 ? COL.danger : COL.textMid} fontSize={11} textAnchor="middle" dominantBaseline="central">
                   FI={fi.toFixed(2)}
                 </text>
               )}
@@ -204,8 +204,8 @@ function ABDDisplay({ abd }: { abd: ABDResult }) {
 /** Progressive failure curve */
 function FailureCurve({ curve }: { curve: { loadFactor: number; maxFI: number; failedPlies: number }[] }) {
   const t = useT();
-  const w = 360, h = 160;
-  const mx = 40, my = 20;
+  const w = 760, h = 280;
+  const mx = 60, my = 30;
   const pw = w - mx * 2, ph = h - my * 2;
 
   const maxLF = Math.max(...curve.map(c => c.loadFactor));
@@ -222,19 +222,19 @@ function FailureCurve({ curve }: { curve: { loadFactor: number; maxFI: number; f
   const fpf = fpfIdx >= 0 ? curve[fpfIdx] : null;
 
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "auto" }}>
       {/* Grid */}
-      <rect x={mx} y={my} width={pw} height={ph} fill="none" stroke="rgba(255,255,255,0.06)" />
+      <rect x={mx} y={my} width={pw} height={ph} fill="none" stroke="rgba(255,255,255,0.1)" />
       {/* FI = 1 threshold line */}
       <line
         x1={mx} y1={my + ph - (1 / maxFI) * ph}
         x2={mx + pw} y2={my + ph - (1 / maxFI) * ph}
-        stroke={COL.danger} strokeWidth={0.5} strokeDasharray="4,3" strokeOpacity={0.5}
+        stroke={COL.danger} strokeWidth={1} strokeDasharray="6,4" strokeOpacity={0.6}
       />
-      <text x={mx + pw + 4} y={my + ph - (1 / maxFI) * ph + 3} fill={COL.danger} fontSize={8} fillOpacity={0.6}>FI=1</text>
+      <text x={mx + pw + 6} y={my + ph - (1 / maxFI) * ph + 4} fill={COL.danger} fontSize={11} fillOpacity={0.8}>FI=1</text>
 
       {/* Curve */}
-      <polyline points={points} fill="none" stroke={COL.accent} strokeWidth={1.5} />
+      <polyline points={points} fill="none" stroke={COL.accent} strokeWidth={2.5} style={{ filter: "drop-shadow(0 0 4px rgba(0,234,255,0.4))" }} />
 
       {/* FPF marker */}
       {fpf && (
@@ -242,25 +242,26 @@ function FailureCurve({ curve }: { curve: { loadFactor: number; maxFI: number; f
           <circle
             cx={mx + (fpf.loadFactor / maxLF) * pw}
             cy={my + ph - (Math.min(fpf.maxFI, maxFI) / maxFI) * ph}
-            r={3} fill={COL.danger} stroke="#fff" strokeWidth={0.5}
+            r={5} fill={COL.danger} stroke="#fff" strokeWidth={1}
+            style={{ filter: `drop-shadow(0 0 6px ${COL.danger}aa)` }}
           />
           <text
-            x={mx + (fpf.loadFactor / maxLF) * pw + 6}
-            y={my + ph - (Math.min(fpf.maxFI, maxFI) / maxFI) * ph - 4}
-            fill={COL.danger} fontSize={8}
+            x={mx + (fpf.loadFactor / maxLF) * pw + 10}
+            y={my + ph - (Math.min(fpf.maxFI, maxFI) / maxFI) * ph - 6}
+            fill={COL.danger} fontSize={12} fontWeight={600}
           >
-            FPF @ {fpf.loadFactor.toFixed(2)}x
+            FPF @ {fpf.loadFactor.toFixed(2)}×
           </text>
         </>
       )}
 
       {/* Axes labels */}
-      <text x={w / 2} y={h - 2} fill={COL.textDim} fontSize={10} textAnchor="middle">{t("load_factor_axis")}</text>
-      <text x={8} y={h / 2} fill={COL.textDim} fontSize={10} textAnchor="middle" transform={`rotate(-90, 8, ${h / 2})`}>{t("max_fi_axis")}</text>
+      <text x={w / 2} y={h - 6} fill={COL.textMid} fontSize={12} textAnchor="middle">{t("load_factor_axis")}</text>
+      <text x={16} y={h / 2} fill={COL.textMid} fontSize={12} textAnchor="middle" transform={`rotate(-90, 16, ${h / 2})`}>{t("max_fi_axis")}</text>
 
       {/* Tick labels */}
       {[0, 0.5, 1, 1.5, 2].map(lf => (
-        <text key={lf} x={mx + (lf / maxLF) * pw} y={my + ph + 12} fill={COL.textDim} fontSize={8} textAnchor="middle">
+        <text key={lf} x={mx + (lf / maxLF) * pw} y={my + ph + 18} fill={COL.textDim} fontSize={11} textAnchor="middle">
           {lf.toFixed(1)}
         </text>
       ))}

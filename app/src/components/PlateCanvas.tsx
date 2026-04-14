@@ -34,10 +34,10 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
   // Axis tick labels
   const axisLabels: ReactElement[] = [];
   for (let g = 0; g <= PLATE_LENGTH; g += 25) {
-    axisLabels.push(<text key={`lx${g}`} x={cx(g)} y={cy(PLATE_WIDTH) + 14} fill={COL.textDim} fontSize={7} textAnchor="middle">{g}</text>);
+    axisLabels.push(<text key={`lx${g}`} x={cx(g)} y={cy(PLATE_WIDTH) + 16} fill={COL.textMid} fontSize={10} textAnchor="middle">{g}</text>);
   }
   for (let g = 0; g <= PLATE_WIDTH; g += 25) {
-    axisLabels.push(<text key={`ly${g}`} x={cx(0) - 6} y={cy(g) + 2.5} fill={COL.textDim} fontSize={7} textAnchor="end">{g}</text>);
+    axisLabels.push(<text key={`ly${g}`} x={cx(0) - 8} y={cy(g) + 4} fill={COL.textMid} fontSize={10} textAnchor="end">{g}</text>);
   }
 
   // Pressure arrows
@@ -57,7 +57,7 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
     });
     arrows.push(
       <text key="plx" x={cx(pressureX > 0 ? 0 : PLATE_LENGTH) + (pressureX > 0 ? -len - 4 : len + 4)} y={cy(PLATE_WIDTH * 0.5) - 6}
-        fill="#60a5fa" fontSize={8} textAnchor="middle" opacity={0.8}>{Math.abs(pressureX)} {unitMPa}</text>
+        fill="#7fdbff" fontSize={11} fontWeight={600} textAnchor="middle" opacity={0.95}>{Math.abs(pressureX)} {unitMPa}</text>
     );
   }
   if (pressureY !== 0) {
@@ -74,7 +74,7 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
     });
     arrows.push(
       <text key="ply" x={cx(PLATE_LENGTH * 0.5) + 30} y={cy(pressureY > 0 ? 0 : PLATE_WIDTH) + (pressureY > 0 ? -len + 2 : len + 10)}
-        fill="#60a5fa" fontSize={8} textAnchor="middle" opacity={0.8}>{Math.abs(pressureY)} {unitMPa}</text>
+        fill="#7fdbff" fontSize={11} fontWeight={600} textAnchor="middle" opacity={0.95}>{Math.abs(pressureY)} {unitMPa}</text>
     );
   }
 
@@ -136,7 +136,7 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
         {/* Label with background for readability */}
         <circle cx={bestPos.x} cy={bestPos.y - 1} r={6}
           fill={COL.canvasBg} fillOpacity={0.85} stroke={DEFECT_COLORS[i]} strokeWidth={1} />
-        <text x={bestPos.x} y={bestPos.y + 2.5} fill={DEFECT_COLORS[i]} fontSize={8} fontWeight="700" textAnchor="middle">
+        <text x={bestPos.x} y={bestPos.y + 3} fill={DEFECT_COLORS[i]} fontSize={11} fontWeight="700" textAnchor="middle">
           {i + 1}
         </text>
       </g>
