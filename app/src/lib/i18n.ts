@@ -56,10 +56,18 @@ const DICT = {
   status_copy_failed:     { en: "Clipboard write failed",      ru: "Не удалось записать в буфер обмена" },
   status_analysis_complete:{ en: "Analysis complete",          ru: "Анализ завершён" },
 
-  // ── Update banner ──
+  // ── Update banner / updater flow ──
   update_available:       { en: "Version {v} is available",    ru: "Доступна версия {v}" },
-  update_download:        { en: "Download update",             ru: "Скачать обновление" },
-  update_dismiss:         { en: "Dismiss",                     ru: "Скрыть" },
+  update_download:        { en: "Update now",                  ru: "Обновить сейчас" },
+  update_dismiss:         { en: "Later",                       ru: "Позже" },
+  update_checking:        { en: "Checking for updates...",     ru: "Проверка обновлений..." },
+  update_downloading:     { en: "Downloading update {pct}%",   ru: "Загрузка обновления {pct}%" },
+  update_installing:      { en: "Installing update...",        ru: "Установка обновления..." },
+  update_ready:           { en: "Update installed — restarting", ru: "Обновление установлено — перезапуск" },
+  update_failed:          { en: "Update failed: {msg}",        ru: "Ошибка обновления: {msg}" },
+  update_up_to_date:      { en: "You are on the latest version", ru: "У вас последняя версия" },
+  update_release_notes:   { en: "What's new",                  ru: "Что нового" },
+  check_for_updates:      { en: "Check for updates",           ru: "Проверить обновления" },
 
   // ── Splash screen ──
   splash_stage_init:      { en: "Initialising engine...",      ru: "Инициализация движка..." },

@@ -1,0 +1,83 @@
+name: Release
+
+# Triggered by pushing a tag that starts with "v" (e.g. v0.3.0, v0.4.0).
+# Builds a signed Windows release, uploads the installer + signature +
+# auto-generated latest.json to a GitHub Release. Installed copies of the
+# app will then see the new version on next launch and offer an in-app
+# update with no reinstall.
+#
+# Required repo secrets:
+#   TAURI_SIGNING_PRIVATE_KEY           — contents of ~/.tauri/rp3.key
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  — empty string (our key has no pw)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install sidecar Python deps and build sidecar
+        shell: bash
+        working-directory: sidecar
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f build.sh ]; then bash build.sh; elif [ -f build.py ]; then python build.py; else pyinstaller --onefile --name rp3-sidecar server.py; fi
+
+      - name: Build Tauri (signed) and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: app
+          tagName: ${{ github.ref_name }}
+          releaseName: 'RP3 ${{ github.ref_name }}'
+          releaseBody: |
+            ## RP3 ${{ github.ref_name }}
+
+            Installed copies will auto-update on next launch. See README for notes.
+          releaseDraft: false
+          prerelease: false
+          # Generate latest.json so existing installs know about this release.
+          # Requires tauri.conf.json `bundle.createUpdaterArtifacts = true`.
+          updaterJsonPreferNsis: true

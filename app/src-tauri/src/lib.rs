@@ -188,6 +188,12 @@ pub fn run() {
         .manage(Sidecar(Arc::new(Mutex::new(proc))))
         .invoke_handler(tauri::generate_handler![load_models, predict])
         .setup(|app| {
+            // Auto-updater (desktop only — mobile is not a target)
+            #[cfg(desktop)]
+            {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

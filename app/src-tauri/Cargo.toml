@@ -1,6 +1,6 @@
 [package]
 name = "rp3"
-version = "0.2.0"
+version = "0.3.0"
 description = "RP3 Composite Failure Surrogate"
 authors = ["Artur Akoev"]
 edition = "2021"
@@ -21,3 +21,5 @@ tauri = { version = "2.10.3", features = [] }
 tauri-plugin-log = "2"
 tokio = { version = "1", features = ["rt", "time"] }
 tauri-plugin-opener = "2.5.3"
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2.3.1"

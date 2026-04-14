@@ -150,75 +150,178 @@ const TABS: { id: AppTab; labelKey: TKey; icon: string }[] = [
   { id: "explorer", labelKey: "tab_explorer", icon: "◐" },
 ];
 
-const GITHUB_REPO = "akoti02/composite-failure-surrogates";
-const CURRENT_VERSION = "0.2.0";
+/**
+ * Tauri auto-updater banner.
+ *
+ * On mount we call `check()` from @tauri-apps/plugin-updater, which hits the
+ * endpoint configured in tauri.conf.json (a signed latest.json on the
+ * GitHub Release), compares versions, and returns an update handle if one
+ * is available. User clicks "Update now" → we stream `downloadAndInstall`
+ * with progress → on finish, `relaunch()` restarts into the new version.
+ *
+ * No manual reinstall. No UAC (Windows NSIS in "passive" mode runs per-user
+ * with just a brief progress window). Signed with a public key baked into
+ * the app binary, so tampered updates are rejected.
+ */
+type UpdateState =
+  | { kind: "idle" }
+  | { kind: "available"; version: string; notes: string; update: UpdateHandle }
+  | { kind: "downloading"; pct: number; total: number }
+  | { kind: "installing" }
+  | { kind: "restarting" }
+  | { kind: "failed"; msg: string };
 
-interface ReleaseInfo {
-  tag: string;
+interface UpdateHandle {
   version: string;
-  downloadUrl: string;
+  body?: string | null;
+  downloadAndInstall: (onEvent: (e: DownloadEvent) => void) => Promise<void>;
 }
-
-function compareVersions(a: string, b: string): number {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] || 0) - (pb[i] || 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
+type DownloadEvent =
+  | { event: "Started"; data: { contentLength?: number } }
+  | { event: "Progress"; data: { chunkLength: number } }
+  | { event: "Finished" };
 
 function UpdateBanner() {
   const t = useT();
-  const [release, setRelease] = useState<ReleaseInfo | null>(null);
+  const [state, setState] = useState<UpdateState>({ kind: "idle" });
   const [dismissed, setDismissed] = useState(false);
 
+  // Check once on mount — silent if no update.
   useEffect(() => {
-    fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
-      .then(r => r.json())
-      .then(data => {
-        const tag = data.tag_name as string;
-        const version = tag.replace(/^v/, "");
-        if (compareVersions(version, CURRENT_VERSION) > 0) {
-          const exe = (data.assets as { name: string; browser_download_url: string }[])
-            ?.find(a => a.name.endsWith("-setup.exe"));
-          setRelease({
-            tag,
-            version,
-            downloadUrl: exe?.browser_download_url
-              ?? `https://github.com/${GITHUB_REPO}/releases/tag/${tag}`,
-          });
-        }
-      })
-      .catch(() => { /* offline or rate-limited — silently skip */ });
+    let cancelled = false;
+    (async () => {
+      try {
+        const { check } = await import("@tauri-apps/plugin-updater");
+        const update = await check();
+        if (cancelled || !update) return;
+        setState({
+          kind: "available",
+          version: update.version,
+          notes: update.body ?? "",
+          update: update as unknown as UpdateHandle,
+        });
+      } catch {
+        // Not running inside Tauri, offline, or endpoint unreachable — silent.
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
-  if (!release || dismissed) return null;
+  const handleInstall = useCallback(async () => {
+    if (state.kind !== "available") return;
+    const handle = state.update;
+    let downloaded = 0;
+    let total = 0;
+    setState({ kind: "downloading", pct: 0, total: 0 });
+    try {
+      await handle.downloadAndInstall((e) => {
+        if (e.event === "Started") {
+          total = e.data.contentLength ?? 0;
+          setState({ kind: "downloading", pct: 0, total });
+        } else if (e.event === "Progress") {
+          downloaded += e.data.chunkLength;
+          const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+          setState({ kind: "downloading", pct, total });
+        } else if (e.event === "Finished") {
+          setState({ kind: "installing" });
+        }
+      });
+      setState({ kind: "restarting" });
+      // Small delay so the user sees the "restarting" message, then relaunch.
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      setTimeout(() => { relaunch().catch(() => {/* ignore */}); }, 400);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setState({ kind: "failed", msg: msg.slice(0, 120) });
+    }
+  }, [state]);
+
+  if (dismissed && state.kind === "available") return null;
+  if (state.kind === "idle") return null;
+
+  // Palette: cyan glow for active states, violet for "available", rose for failure.
+  const palette = state.kind === "failed"
+    ? { bg: "rgba(255,94,135,0.12)", border: "rgba(255,94,135,0.35)", text: "#ffd0dc", btn: "#ff5e87", btnText: "#1a0810", glow: "rgba(255,94,135,0.25)" }
+    : state.kind === "available"
+      ? { bg: "rgba(183,148,255,0.12)", border: "rgba(183,148,255,0.35)", text: "#e0ccff", btn: "#b794ff", btnText: "#1a0a2e", glow: "rgba(183,148,255,0.4)" }
+      : { bg: "rgba(0,234,255,0.10)", border: "rgba(0,234,255,0.32)", text: "#b4f5ff", btn: COL.accent, btnText: "#041017", glow: "rgba(0,234,255,0.4)" };
 
   return (
     <div
-      className="flex items-center justify-center gap-3 text-[12px] py-1.5 px-4"
-      style={{ background: "rgba(183,148,255,0.12)", borderBottom: "1px solid rgba(183,148,255,0.3)", color: "#e0ccff", boxShadow: "0 0 18px rgba(183,148,255,0.12)" }}
+      className="flex items-center justify-center gap-3 text-[12px] py-2 px-4"
+      style={{
+        background: palette.bg,
+        borderBottom: `1px solid ${palette.border}`,
+        color: palette.text,
+        boxShadow: `0 0 22px ${palette.glow}`,
+      }}
     >
-      <span>{t("update_available", { v: release.version })}</span>
-      <button
-        className="px-3 py-0.5 rounded-md text-[12px] font-semibold cursor-pointer"
-        style={{ background: "#b794ff", color: "#1a0a2e", border: "none", boxShadow: "0 0 12px rgba(183,148,255,0.6)" }}
-        onClick={() => import("@tauri-apps/plugin-opener").then(m => m.openUrl(release.downloadUrl)).catch(() => window.open(release.downloadUrl, "_blank"))}
-      >
-        {t("update_download")}
-      </button>
-      <button
-        className="text-[12px] cursor-pointer"
-        style={{ color: "rgba(183,148,255,0.7)", background: "none", border: "none" }}
-        onClick={() => setDismissed(true)}
-      >
-        {t("update_dismiss")}
-      </button>
+      {state.kind === "available" && (
+        <>
+          <span className="font-semibold">{t("update_available", { v: state.version })}</span>
+          {state.notes && (
+            <span className="opacity-75 truncate max-w-[400px]" title={state.notes}>
+              — {state.notes.split("\n")[0]}
+            </span>
+          )}
+          <button
+            className="px-3 py-1 rounded-md text-[12px] font-semibold cursor-pointer btn-press"
+            style={{ background: palette.btn, color: palette.btnText, border: "none", boxShadow: `0 0 12px ${palette.glow}`, textShadow: "0 0 6px rgba(255,255,255,0.3)" }}
+            onClick={handleInstall}
+          >
+            {t("update_download")}
+          </button>
+          <button
+            className="text-[12px] cursor-pointer"
+            style={{ color: `${palette.text}99`, background: "none", border: "none" }}
+            onClick={() => setDismissed(true)}
+          >
+            {t("update_dismiss")}
+          </button>
+        </>
+      )}
+
+      {state.kind === "downloading" && (
+        <>
+          <span className="font-semibold">{t("update_downloading", { pct: state.pct })}</span>
+          <div className="w-64 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${state.pct}%`,
+                background: COL.accent,
+                boxShadow: "0 0 10px rgba(0,234,255,0.7)",
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {state.kind === "installing" && (
+        <span className="font-semibold">{t("update_installing")}</span>
+      )}
+      {state.kind === "restarting" && (
+        <span className="font-semibold">{t("update_ready")}</span>
+      )}
+      {state.kind === "failed" && (
+        <>
+          <span className="font-semibold">{t("update_failed", { msg: state.msg })}</span>
+          <button
+            className="text-[12px] cursor-pointer"
+            style={{ color: `${palette.text}99`, background: "none", border: "none" }}
+            onClick={() => setDismissed(true)}
+          >
+            {t("update_dismiss")}
+          </button>
+        </>
+      )}
     </div>
   );
 }
+
+// Reference the version constant so rollout tooling can grep for it.
+const CURRENT_VERSION = "0.3.0";
+void CURRENT_VERSION;
 
 function AppInner() {
   const t = useT();
