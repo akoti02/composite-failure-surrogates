@@ -9,77 +9,97 @@ A desktop application for predicting stress distributions and failure in composi
 - **Laminate Tab** — Classical Lamination Theory engine: ABD matrices, ply stress/strain analysis, progressive failure simulation, thermal effects
 - **Explorer Tab** — Parameter sweeps, sensitivity analysis, and Monte Carlo simulation across defect/load space
 - **Project Tab** — Save/load analysis sessions, compare results, export data
+- **Live auto-update, bilingual UI (EN / RU), signed release binaries**
+
+## Install (recommended)
+
+Pre-built binaries are published to [GitHub Releases](https://github.com/akoti02/composite-failure-surrogates/releases).
+
+### Windows (x64)
+1. Download `RP3_*_x64-setup.exe` from the latest release
+2. Run it — the NSIS installer is per-user, no admin rights needed
+3. Launch RP3 from Start menu
+
+### macOS (Apple Silicon)
+1. Download `RP3_*_aarch64.dmg` from the latest release
+2. Open the disk image, drag **RP3** to Applications
+3. **First launch:** right-click (or Ctrl-click) the app in Applications → **Open** → **Open** in the confirmation dialog.
+   This is needed once because the build isn't Apple-notarized (we don't pay for an Apple Developer account); Gatekeeper will stop warning after this. Every update from here on installs without the prompt.
+
+### Auto-update
+From v0.3.0 onwards, installed copies check GitHub Releases on launch. When a new version is out you'll see a violet banner — one click → signed binary downloads → installer runs silently (Windows: passive NSIS; macOS: in-place replace) → app relaunches on the new version. No reinstall wizard.
 
 ## Tech Stack
 
 - **Frontend**: React + TypeScript + Tailwind CSS
-- **Desktop**: Tauri (Rust)
-- **ML Backend**: Python sidecar (PyTorch, XGBoost, scikit-learn)
+- **Desktop**: Tauri 2 (Rust)
+- **ML Backend**: Python sidecar (XGBoost, scikit-learn, NumPy)
 - **Physics**: Lekhnitskii complex variable solution, CLT, Tsai-Wu/Hashin failure criteria
 
-## Quick Start
+## Build from source
+
+Only needed if you want to modify the app. The [CI workflow](../.github/workflows/release.yml) is the canonical build recipe — if a local build disagrees with it, CI is right.
 
 ### Prerequisites
-- Node.js 18+
-- Rust toolchain (for Tauri)
-- Python 3.10+ with dependencies: `pip install torch xgboost scikit-learn numpy`
+- **Node.js 20 LTS** (`nvm install 20` / `fnm use 20`). Node 21+ is not tested against our Tauri version.
+- Rust stable toolchain (install via rustup)
+- Python 3.12 with sidecar deps: `pip install -r sidecar/requirements.txt`
+- macOS only: `brew install libomp` (xgboost runtime dep)
 
 ### Development
+
 ```bash
+cd app
 npm install
-npm run dev        # Vite dev server (frontend only)
-npx tauri dev      # Full app with Rust + Python sidecar
+npm run dev          # Vite dev server (frontend only)
+npx tauri dev        # Full app with Rust + Python sidecar (spawns server.py directly)
 ```
 
-### Build Release
+### Build a signed release locally
+
 ```bash
+# 1. Build the Python sidecar
+cd app/sidecar
+pyinstaller --clean rp3-sidecar.spec
+
+# 2. Build the Tauri bundle (set signing key env vars first)
+cd ..
+export TAURI_SIGNING_PRIVATE_KEY="<path to ~/.tauri/rp3.key>"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 npx tauri build
 ```
 
-Output: `src-tauri/target/release/rp3.exe` (standalone) or NSIS installer in `src-tauri/target/release/bundle/nsis/`
-
-### Sidecar Setup
-The ML sidecar must be built separately before `tauri build`:
-```bash
-cd sidecar
-pip install pyinstaller
-pyinstaller rp3-sidecar.spec
-```
-This produces `sidecar/dist/rp3-sidecar.exe` which Tauri bundles into the release.
+Output:
+- **Windows**: `src-tauri/target/release/bundle/nsis/RP3_*-setup.exe` (+ `.sig`)
+- **macOS**: `src-tauri/target/release/bundle/dmg/RP3_*.dmg` (+ `.app.tar.gz` for updater, + `.sig`)
 
 ## Project Structure
 
 ```
 src/
-  components/       # React UI components
+  components/       React UI components
   lib/
-    stress-field.ts # Lekhnitskii analytical solver
-    clt.ts          # Classical Lamination Theory
-    ply-stress-field.ts  # Ply-resolved stress + failure analysis
-    materials.ts    # Composite material database
-    types.ts        # Shared type definitions
+    i18n.ts          Bilingual dictionary + <LangProvider>
+    stress-field.ts  Lekhnitskii analytical solver
+    clt.ts           Classical Lamination Theory
+    materials.ts     Composite material database (5 materials)
+    presets.ts       Predefined analysis scenarios
+    types.ts         Shared type definitions
 sidecar/
-  server.py         # Python ML inference server
-  inference.py      # Model loading and prediction
+  server.py          Python ML inference server (stdin/stdout JSON-RPC)
+  inference.py       Model loading and prediction
+  _models_data.py    Embedded XGBoost model blobs (base64)
+  rp3-sidecar.spec   PyInstaller build spec (cross-platform)
+  requirements.txt   Pinned Python deps
 src-tauri/
-  src/              # Rust backend (Tauri commands, sidecar management)
+  src/               Rust backend (Tauri commands, sidecar management)
+  tauri.conf.json    App config (incl. updater endpoint + pubkey)
 ```
 
-## Download
+## Troubleshooting
 
-Pre-built **Windows x64** installer: see [Releases](https://github.com/akoti02/composite-failure-surrogates/releases) page.
+**App starts but status says "No models loaded / Error: Sidecar not found"** → the Python sidecar crashed or isn't bundled. Check logs at `~/.rp3/sidecar.log` and `~/.rp3/sidecar_stderr.log`.
 
-**macOS / Linux:** No pre-built binaries yet. Build from source:
-```bash
-# macOS — run the setup script, then build
-./setup-mac.sh
-npx tauri build
+**macOS: "RP3 is damaged and can't be opened"** → you double-clicked without right-click. Right-click → Open. If that still fails, `xattr -rd com.apple.quarantine /Applications/RP3.app` in Terminal.
 
-# Linux — install deps manually, then build
-npm install
-pip3 install numpy xgboost scikit-learn pyinstaller
-cd sidecar && pyinstaller --onefile --name rp3-sidecar server.py \
-  --hidden-import inference --hidden-import _models_data \
-  --add-data "_models_data.py:." && cd ..
-npx tauri build
-```
+**Update banner never appears** → check that you're online; the app queries `https://github.com/akoti02/composite-failure-surrogates/releases/latest/download/latest.json` once on launch.
