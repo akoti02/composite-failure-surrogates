@@ -67,6 +67,14 @@ jobs:
           cache: pip
           cache-dependency-path: app/sidecar/requirements.txt
 
+      # macOS only: xgboost's libxgboost.dylib has a runtime dependency on
+      # libomp.dylib (OpenMP). The GitHub macos-latest runner doesn't
+      # ship it; without this step `import xgboost` fails and the spec
+      # file raises XGBoostError during PyInstaller analysis.
+      - name: Install OpenMP runtime (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: brew install libomp
+
       - name: Install frontend dependencies
         working-directory: app
         run: npm ci
