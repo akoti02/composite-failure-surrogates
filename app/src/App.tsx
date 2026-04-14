@@ -238,6 +238,7 @@ function AppInner() {
   // UI state
   const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("analysis");
+  const [activePreset, setActivePreset] = useState("");
   const [showProjects, setShowProjects] = useState(false);
   const [compareSnapshots, setCompareSnapshots] = useState<AnalysisSnapshot[]>([]);
 
@@ -308,7 +309,8 @@ function AppInner() {
 
   const handlePreset = useCallback((name: string) => {
     const p = PRESETS[name];
-    if (!p) return;
+    if (!p) { setActivePreset(""); return; }
+    setActivePreset(name);
     setNDefects(p.n_defects);
     setPressureX(p.pressure_x);
     setPressureY(p.pressure_y);
@@ -324,17 +326,20 @@ function AppInner() {
     setResults(null);
   }, []);
 
-  // Core prediction function — used by both auto-predict and manual Run
-  // Note: predictingRef check + set is safe because JS is single-threaded;
-  // no other code can run between the guard check and the flag set.
+  // Core prediction function — used by both auto-predict and manual Run.
+  // Uses a generation counter to discard stale in-flight predictions when
+  // inputs change, preventing old results from overwriting new state.
   const predictingRef = useRef(false);
+  const generationRef = useRef(0);
   const runPrediction = useCallback(async (saveToHistory: boolean) => {
-    if (!modelsReady || predictingRef.current) return;
+    if (!modelsReady) return;
+    const gen = ++generationRef.current;
     predictingRef.current = true;
     setPredicting(true);
     try {
       const raw = buildRawInputs(nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects);
       const resp = await invoke<{ ok: boolean; results: PredictionResults; error?: string }>("predict", { params: raw });
+      if (gen !== generationRef.current) return; // stale — inputs changed while we were waiting
       if (resp.ok) {
         setResults(resp.results);
         setStatus("Live");
@@ -343,12 +348,16 @@ function AppInner() {
         setStatus(`Error: ${resp.error}`);
       }
     } catch (e) {
+      if (gen !== generationRef.current) return; // stale
       const msg = e instanceof Error ? e.message : String(e);
       console.error("Prediction failed:", msg);
       setStatus(`Error: ${msg.slice(0, 80)}`);
+    } finally {
+      if (gen === generationRef.current) {
+        predictingRef.current = false;
+        setPredicting(false);
+      }
     }
-    predictingRef.current = false;
-    setPredicting(false);
   }, [modelsReady, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects]);
 
   // Live prediction — auto-triggers on any input change (200ms debounce)
@@ -364,6 +373,7 @@ function AppInner() {
   }, [runPrediction]);
 
   const handleReset = useCallback(() => {
+    setActivePreset("");
     setNDefects(3);
     setPressureX(100.0);
     setPressureY(0.0);
@@ -387,6 +397,7 @@ function AppInner() {
   }, [results, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects]);
 
   const handleRestoreSnapshot = useCallback((snap: AnalysisSnapshot) => {
+    setActivePreset("");
     setNDefects(snap.nDefects);
     setPressureX(snap.pressureX);
     setPressureY(snap.pressureY);
@@ -420,7 +431,16 @@ function AppInner() {
     return () => window.removeEventListener("keydown", handler);
   }, [handlePredict, modelsReady]);
 
+  // Wrap input setters to clear preset label on manual changes
+  const setNDefectsManual = useCallback((v: number) => { setActivePreset(""); setNDefects(v); }, []);
+  const setPressureXManual = useCallback((v: number) => { setActivePreset(""); setPressureX(v); }, []);
+  const setPressureYManual = useCallback((v: number) => { setActivePreset(""); setPressureY(v); }, []);
+  const setMaterialKeyManual = useCallback((v: string) => { setActivePreset(""); setMaterialKey(v); }, []);
+  const setLayupKeyManual = useCallback((v: string) => { setActivePreset(""); setLayupKey(v); }, []);
+  const setBcModeManual = useCallback((v: string) => { setActivePreset(""); setBcMode(v); }, []);
+
   const updateDefect = useCallback((index: number, field: keyof DefectParams, value: number) => {
+    setActivePreset("");
     setDefects((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -437,6 +457,7 @@ function AppInner() {
       <UpdateBanner />
       <Header
         status={status} modelsReady={modelsReady} predicting={predicting}
+        activePreset={activePreset}
         onPreset={handlePreset} onExport={handleExport} hasResults={results !== null}
         onPredict={handlePredict} onReset={handleReset}
         onProjects={() => setShowProjects(true)}
@@ -499,12 +520,12 @@ function AppInner() {
 
               {/* INPUT PANEL — primary content, gets all remaining space */}
               <InputPanel
-                nDefects={nDefects} setNDefects={setNDefects}
-                pressureX={pressureX} setPressureX={setPressureX}
-                pressureY={pressureY} setPressureY={setPressureY}
-                materialKey={materialKey} setMaterialKey={setMaterialKey}
-                layupKey={layupKey} setLayupKey={setLayupKey}
-                bcMode={bcMode} setBcMode={setBcMode}
+                nDefects={nDefects} setNDefects={setNDefectsManual}
+                pressureX={pressureX} setPressureX={setPressureXManual}
+                pressureY={pressureY} setPressureY={setPressureYManual}
+                materialKey={materialKey} setMaterialKey={setMaterialKeyManual}
+                layupKey={layupKey} setLayupKey={setLayupKeyManual}
+                bcMode={bcMode} setBcMode={setBcModeManual}
                 defects={defects} updateDefect={updateDefect}
               />
             </div>

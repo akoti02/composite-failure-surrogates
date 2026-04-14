@@ -5,6 +5,7 @@ interface Props {
   status: string;
   modelsReady: boolean;
   predicting: boolean;
+  activePreset: string;
   onPreset: (name: string) => void;
   onExport: () => void;
   hasResults: boolean;
@@ -14,7 +15,7 @@ interface Props {
   onLaminate: () => void;
 }
 
-export function Header({ status, modelsReady, predicting, onPreset, onExport, hasResults, onPredict, onReset, onProjects, onLaminate }: Props) {
+export function Header({ status, modelsReady, predicting, activePreset, onPreset, onExport, hasResults, onPredict, onReset, onProjects, onLaminate }: Props) {
   const dotColor = predicting ? COL.accent : modelsReady ? COL.success : COL.textDim;
   const dotClass = predicting ? "dot-pulse-fast" : modelsReady ? "" : "dot-pulse";
   const dotLabel = predicting ? "Computing" : modelsReady ? "Live" : "Loading";
@@ -40,13 +41,13 @@ export function Header({ status, modelsReady, predicting, onPreset, onExport, ha
           className="text-[11px] px-2.5 py-1 rounded-md cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500"
           style={{
             background: COL.panel,
-            border: `1px solid ${COL.border}`,
-            color: COL.textMid,
+            border: `1px solid ${activePreset ? COL.accent + "40" : COL.border}`,
+            color: activePreset ? COL.text : COL.textMid,
           }}
-          defaultValue=""
-          onChange={(e) => { onPreset(e.target.value); e.target.value = ""; }}
+          value={activePreset}
+          onChange={(e) => onPreset(e.target.value)}
         >
-          <option value="" disabled>Presets</option>
+          <option value="">Presets</option>
           {Object.keys(PRESETS).map((name) => (
             <option key={name} value={name}>{name}</option>
           ))}
