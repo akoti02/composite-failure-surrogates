@@ -7,7 +7,8 @@
 export interface MaterialProperties {
   id: number;       // V11 material_id (used by ML models)
   name: string;
-  description: string;
+  description: string;   // English fallback
+  descKey: string;       // i18n translation key for description (see lib/i18n.ts)
   E1: number;   // Longitudinal modulus (MPa)
   E2: number;   // Transverse modulus (MPa)
   G12: number;  // In-plane shear modulus (MPa)
@@ -23,7 +24,8 @@ export interface MaterialProperties {
 export const MATERIAL_DB: Record<string, MaterialProperties> = {
   "T300/5208": {
     id: 1, name: "T300/5208",
-    description: "Standard modulus CFRP. Most-cited benchmark in composites literature.",
+    description: "Standard-modulus CFRP. Most-cited benchmark in composites literature.",
+    descKey: "mat_t300_desc",
     E1: 135000, E2: 10000, G12: 5200, v12: 0.27,
     Xt: 1500, Xc: 1200, Yt: 50, Yc: 250, S12: 70,
     plyThickness: 0.15,
@@ -31,27 +33,31 @@ export const MATERIAL_DB: Record<string, MaterialProperties> = {
   "IM7/8552": {
     id: 5, name: "IM7/8552",
     description: "Intermediate modulus, toughened epoxy. Aerospace primary structure grade.",
+    descKey: "mat_im7_desc",
     E1: 171400, E2: 9080, G12: 5290, v12: 0.32,
     Xt: 2326, Xc: 1200, Yt: 62, Yc: 200, S12: 92,
     plyThickness: 0.15,
   },
   "E-glass/Epoxy": {
     id: 8, name: "E-glass/Epoxy",
-    description: "Glass fiber reinforced epoxy. Lower cost, fundamentally different failure behavior.",
+    description: "Glass-fibre reinforced epoxy. Lower cost, fundamentally different failure behaviour.",
+    descKey: "mat_eglass_desc",
     E1: 39000, E2: 8600, G12: 3800, v12: 0.28,
     Xt: 1000, Xc: 700, Yt: 40, Yc: 120, S12: 70,
     plyThickness: 0.15,
   },
   "Kevlar49/Epoxy": {
     id: 12, name: "Kevlar 49/Epoxy",
-    description: "Aramid fiber reinforced epoxy. Unique tension/compression asymmetry.",
+    description: "Aramid-fibre reinforced epoxy. Unique tension/compression asymmetry.",
+    descKey: "mat_kevlar_desc",
     E1: 80000, E2: 5500, G12: 2200, v12: 0.34,
     Xt: 1400, Xc: 335, Yt: 30, Yc: 158, S12: 49,
     plyThickness: 0.15,
   },
   "Flax/Epoxy": {
     id: 15, name: "Flax/Epoxy",
-    description: "Natural fiber composite. Low-performance extreme, tests model generalization.",
+    description: "Natural-fibre composite. Low-performance extreme, tests model generalisation.",
+    descKey: "mat_flax_desc",
     E1: 35000, E2: 5500, G12: 3000, v12: 0.30,
     Xt: 350, Xc: 150, Yt: 25, Yc: 100, S12: 40,
     plyThickness: 0.15,
@@ -106,6 +112,7 @@ export interface LayupDefinition {
   id: number;       // V11 layup_id (used by ML models)
   name: string;
   description: string;
+  descKey: string;       // i18n translation key (see lib/i18n.ts)
   angles: number[];
 }
 
@@ -113,31 +120,37 @@ export const LAYUP_DB: Record<string, LayupDefinition> = {
   "QI_8": {
     id: 1, name: "QI [0/45/-45/90]s",
     description: "Quasi-isotropic 8-ply. Balanced failure modes.",
+    descKey: "layup_qi_desc",
     angles: [0, 45, -45, 90, 90, -45, 45, 0],
   },
   "CP_8": {
     id: 3, name: "CP [0/90]2s",
     description: "Cross-ply 8-ply. Distinct 0/90 interaction.",
+    descKey: "layup_cp_desc",
     angles: [0, 90, 0, 90, 90, 0, 90, 0],
   },
   "UD_0_8": {
     id: 4, name: "UD [0]8",
-    description: "Unidirectional 8-ply. Pure fiber-dominated response.",
+    description: "Unidirectional 8-ply. Pure fibre-dominated response.",
+    descKey: "layup_ud_desc",
     angles: [0, 0, 0, 0, 0, 0, 0, 0],
   },
   "Angle_pm45": {
     id: 6, name: "[±45]2s",
     description: "±45 angle-ply. Shear-dominated, exercises matrix failure.",
+    descKey: "layup_pm45_desc",
     angles: [45, -45, 45, -45, -45, 45, -45, 45],
   },
   "Angle_pm30": {
     id: 7, name: "[±30]2s",
-    description: "±30 angle-ply. Off-axis mixed fiber/matrix response.",
+    description: "±30 angle-ply. Off-axis mixed fibre/matrix response.",
+    descKey: "layup_pm30_desc",
     angles: [30, -30, 30, -30, -30, 30, -30, 30],
   },
   "Skin_25_50_25": {
     id: 13, name: "Skin 25/50/25",
     description: "Aerospace realistic 18-ply. Multi-angle with thickness.",
+    descKey: "layup_skin_desc",
     angles: [45, -45, 0, 0, 90, 0, 0, -45, 45, 45, -45, 0, 0, 90, 0, 0, -45, 45],
   },
 };
@@ -148,9 +161,9 @@ export const DEFAULT_LAYUP_ID = "QI_8";
  * V11 boundary conditions — 3 modes.
  */
 export const BC_MODES = [
-  { id: "tension_comp", name: "Tension + Compression", description: "px on right, -py on top/bottom" },
-  { id: "biaxial", name: "Biaxial", description: "px on right, py on top/bottom" },
-  { id: "uniaxial_shear", name: "Uniaxial + Shear", description: "px on right, shear via X-force on top" },
+  { id: "tension_comp", name: "Tension + Compression", nameKey: "bc_tension_comp", description: "px on right, -py on top/bottom", descKey: "bc_tension_comp_desc" },
+  { id: "biaxial", name: "Biaxial", nameKey: "bc_biaxial", description: "px on right, py on top/bottom", descKey: "bc_biaxial_desc" },
+  { id: "uniaxial_shear", name: "Uniaxial + Shear", nameKey: "bc_uniaxial_shear", description: "px on right, shear via X-force on top", descKey: "bc_uniaxial_shear_desc" },
 ] as const;
 
 export const DEFAULT_BC_MODE = "tension_comp";

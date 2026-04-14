@@ -5,34 +5,37 @@ import { invoke } from "@tauri-apps/api/core";
 import type { RawInputs, PredictionResults } from "../lib/types";
 import { DEFAULT_DEFECT } from "../lib/presets";
 import { MATERIAL_DB, LAYUP_DB } from "../lib/materials";
+import { useT } from "../lib/i18n";
+import type { TKey } from "../lib/i18n";
 
 /** Parameter definition for sweeps */
 interface SweepParam {
   id: string;
-  label: string;
+  labelKey: TKey;
+  unitKey?: TKey;
+  unitLiteral?: string;
   min: number;
   max: number;
   default: number;
-  unit: string;
 }
 
 const SWEEP_PARAMS: SweepParam[] = [
-  { id: "pressure_x", label: "Pressure X", min: -500, max: 500, default: 100, unit: "MPa" },
-  { id: "pressure_y", label: "Pressure Y", min: -500, max: 500, default: 0, unit: "MPa" },
-  { id: "defect1_half_length", label: "Defect 1 Half-Length", min: 0.1, max: 50, default: 10, unit: "mm" },
-  { id: "defect1_width", label: "Defect 1 Width", min: 0.01, max: 10, default: 1, unit: "mm" },
-  { id: "defect1_angle", label: "Defect 1 Angle", min: -90, max: 90, default: 0, unit: "deg" },
-  { id: "defect1_roughness", label: "Defect 1 Roughness", min: 0, max: 1, default: 0.5, unit: "" },
+  { id: "pressure_x",          labelKey: "sp_pressure_x",          unitKey: "unit_mpa", min: -500, max: 500, default: 100 },
+  { id: "pressure_y",          labelKey: "sp_pressure_y",          unitKey: "unit_mpa", min: -500, max: 500, default: 0 },
+  { id: "defect1_half_length", labelKey: "sp_defect1_half_length", unitKey: "unit_mm",  min: 0.1,  max: 50,  default: 10 },
+  { id: "defect1_width",       labelKey: "sp_defect1_width",       unitKey: "unit_mm",  min: 0.01, max: 10,  default: 1 },
+  { id: "defect1_angle",       labelKey: "sp_defect1_angle",       unitKey: "unit_deg", min: -90,  max: 90,  default: 0 },
+  { id: "defect1_roughness",   labelKey: "sp_defect1_roughness",   unitLiteral: "",     min: 0,    max: 1,   default: 0.5 },
 ];
 
-const OUTPUT_FIELDS: { id: keyof PredictionResults; label: string; unit: string }[] = [
-  { id: "tsai_wu_index", label: "Tsai-Wu Index", unit: "" },
-  { id: "max_s11", label: "Max S11", unit: "MPa" },
-  { id: "min_s11", label: "Min S11", unit: "MPa" },
-  { id: "max_s12", label: "Max S12", unit: "MPa" },
-  { id: "max_hashin_ft", label: "Hashin FT", unit: "" },
-  { id: "max_hashin_mt", label: "Hashin MT", unit: "" },
-  { id: "max_hashin_mc", label: "Hashin MC", unit: "" },
+const OUTPUT_FIELDS: { id: keyof PredictionResults; labelKey: TKey; unitKey?: TKey }[] = [
+  { id: "tsai_wu_index", labelKey: "of_tsai_wu" },
+  { id: "max_s11",       labelKey: "of_max_s11",  unitKey: "unit_mpa" },
+  { id: "min_s11",       labelKey: "of_min_s11",  unitKey: "unit_mpa" },
+  { id: "max_s12",       labelKey: "of_max_s12",  unitKey: "unit_mpa" },
+  { id: "max_hashin_ft", labelKey: "of_hashin_ft" },
+  { id: "max_hashin_mt", labelKey: "of_hashin_mt" },
+  { id: "max_hashin_mc", labelKey: "of_hashin_mc" },
 ];
 
 type ExplorerMode = "sweep1d" | "sweep2d" | "montecarlo" | "sensitivity";
@@ -290,6 +293,12 @@ function SensitivityBars({ params, indices, title, width = 360, height = 200 }: 
 }
 
 export function DesignExplorer(props: ExplorerProps) {
+  const t = useT();
+  const paramUnit = (p: SweepParam) => p.unitKey ? t(p.unitKey) : (p.unitLiteral ?? "");
+  const outLabel = (id: string) => {
+    const f = OUTPUT_FIELDS.find(x => x.id === id);
+    return f ? t(f.labelKey) : id;
+  };
   const [mode, setMode] = useState<ExplorerMode>("sweep1d");
   const [paramX, setParamX] = useState("pressure_x");
   const [paramY, setParamY] = useState("pressure_y");
@@ -551,10 +560,10 @@ export function DesignExplorer(props: ExplorerProps) {
   }, [mode, runSweep1D, runSweep2D, runMonteCarlo, runSensitivity]);
 
   const modes: { id: ExplorerMode; label: string; desc: string }[] = [
-    { id: "sweep1d", label: "1D Sweep", desc: "Vary one parameter, plot response" },
-    { id: "sweep2d", label: "2D Sweep", desc: "Vary two parameters, contour map" },
-    { id: "montecarlo", label: "Monte Carlo", desc: "Random sampling, statistics" },
-    { id: "sensitivity", label: "Sensitivity", desc: "Morris screening, parameter ranking" },
+    { id: "sweep1d",     label: t("explorer_sweep1d"),     desc: t("explorer_sweep1d_desc") },
+    { id: "sweep2d",     label: t("explorer_sweep2d"),     desc: t("explorer_sweep2d_desc") },
+    { id: "montecarlo",  label: t("explorer_montecarlo"),  desc: t("explorer_montecarlo_desc") },
+    { id: "sensitivity", label: t("explorer_sensitivity"), desc: t("explorer_sensitivity_desc") },
   ];
 
   const colors = [COL.accent, "#f472b6", "#38bdf8", "#4ade80", "#fb923c", "#a78bfa"];
@@ -566,11 +575,13 @@ export function DesignExplorer(props: ExplorerProps) {
         {modes.map(m => (
           <button
             key={m.id}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+            className="px-3.5 py-2 rounded-lg text-[13px] font-semibold transition-all btn-press"
             style={{
               background: mode === m.id ? COL.accentMuted : "transparent",
               color: mode === m.id ? COL.accent : COL.textDim,
-              border: `1px solid ${mode === m.id ? `${COL.accent}40` : COL.border}`,
+              border: `1px solid ${mode === m.id ? COL.borderBright : COL.border}`,
+              boxShadow: mode === m.id ? COL.accentGlowSoft : "none",
+              textShadow: mode === m.id ? "0 0 6px rgba(0,234,255,0.4)" : undefined,
             }}
             onClick={() => setMode(m.id)}
             title={m.desc}
@@ -584,17 +595,17 @@ export function DesignExplorer(props: ExplorerProps) {
       <div className="flex items-end gap-3 flex-wrap">
         {(mode === "sweep1d" || mode === "sweep2d") && (
           <div className="flex flex-col gap-1">
-            <label className="text-[10px]" style={{ color: COL.textDim }}>
-              {mode === "sweep2d" ? "X Parameter" : "Parameter"}
+            <label className="text-[12px]" style={{ color: COL.textMid }}>
+              {mode === "sweep2d" ? t("x_parameter") : t("parameter")}
             </label>
             <select
-              className="text-[11px] px-2 py-1.5 rounded-md outline-none"
-              style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.textMid }}
+              className="text-[13px] px-2.5 py-2 rounded-md outline-none"
+              style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
               value={paramX}
               onChange={(e) => setParamX(e.target.value)}
             >
               {SWEEP_PARAMS.map(p => (
-                <option key={p.id} value={p.id}>{p.label} ({p.unit})</option>
+                <option key={p.id} value={p.id}>{t(p.labelKey)} ({paramUnit(p)})</option>
               ))}
             </select>
           </div>
@@ -602,40 +613,40 @@ export function DesignExplorer(props: ExplorerProps) {
 
         {mode === "sweep2d" && (
           <div className="flex flex-col gap-1">
-            <label className="text-[10px]" style={{ color: COL.textDim }}>Y Parameter</label>
+            <label className="text-[12px]" style={{ color: COL.textMid }}>{t("y_parameter")}</label>
             <select
-              className="text-[11px] px-2 py-1.5 rounded-md outline-none"
-              style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.textMid }}
+              className="text-[13px] px-2.5 py-2 rounded-md outline-none"
+              style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
               value={paramY}
               onChange={(e) => setParamY(e.target.value)}
             >
               {SWEEP_PARAMS.map(p => (
-                <option key={p.id} value={p.id}>{p.label} ({p.unit})</option>
+                <option key={p.id} value={p.id}>{t(p.labelKey)} ({paramUnit(p)})</option>
               ))}
             </select>
           </div>
         )}
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px]" style={{ color: COL.textDim }}>Output</label>
+          <label className="text-[12px]" style={{ color: COL.textMid }}>{t("output")}</label>
           <select
-            className="text-[11px] px-2 py-1.5 rounded-md outline-none"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.textMid }}
+            className="text-[13px] px-2.5 py-2 rounded-md outline-none"
+            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             value={outputField}
             onChange={(e) => setOutputField(e.target.value as keyof PredictionResults)}
           >
             {OUTPUT_FIELDS.map(f => (
-              <option key={f.id} value={f.id}>{f.label}</option>
+              <option key={f.id} value={f.id}>{t(f.labelKey)}</option>
             ))}
           </select>
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px]" style={{ color: COL.textDim }}>
-            {mode === "montecarlo" ? "Samples" : "Steps"}
+          <label className="text-[12px]" style={{ color: COL.textMid }}>
+            {mode === "montecarlo" ? t("samples") : t("steps")}
           </label>
           <input
-            className="text-[11px] px-2 py-1.5 rounded-md outline-none w-16 tabular-nums"
+            className="text-[13px] px-2.5 py-2 rounded-md outline-none w-20 tabular-nums"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             type="number"
             value={mode === "montecarlo" ? nSamples : nSteps}
@@ -645,36 +656,37 @@ export function DesignExplorer(props: ExplorerProps) {
         </div>
 
         <button
-          className="px-4 py-1.5 rounded-lg text-[11px] font-semibold btn-press"
+          className="px-4 py-2 rounded-lg text-[13px] font-semibold btn-press"
           style={{
             background: running ? "rgba(255,255,255,0.06)" : COL.accent,
-            color: running ? COL.textDim : "#fff",
-            border: `1px solid ${running ? COL.border : "rgba(99,102,241,0.3)"}`,
+            color: running ? COL.textDim : "#041017",
+            border: `1px solid ${running ? COL.border : "rgba(0,234,255,0.5)"}`,
+            boxShadow: running ? "none" : "0 0 18px rgba(0,234,255,0.35)",
           }}
           onClick={() => {
             if (running) { abortRef.current = true; } else { handleRun(); }
           }}
           disabled={!props.modelsReady && !running}
         >
-          {running ? `${Math.round(progress * 100)}% — Stop` : !props.modelsReady ? "Models loading..." : "Run"}
+          {running ? `${Math.round(progress * 100)}% — ${t("stop")}` : !props.modelsReady ? t("models_loading") : t("run")}
         </button>
 
         {/* CSV Export */}
         {(result1D || resultMC || resultSens) && !running && (
           <button
-            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold btn-press"
+            className="px-3 py-2 rounded-lg text-[13px] font-semibold btn-press"
             style={{ background: COL.panel, color: COL.textMid, border: `1px solid ${COL.border}` }}
-            aria-label="Export results as CSV"
+            aria-label={t("export_csv_aria")}
             onClick={() => {
               let csv = "";
               if (result1D && mode === "sweep1d") {
-                const cols = ["Parameter Value", ...OUTPUT_FIELDS.map(f => f.label)];
+                const cols = [t("parameter"), ...OUTPUT_FIELDS.map(f => t(f.labelKey))];
                 csv = cols.join(",") + "\n";
                 for (let i = 0; i < result1D.paramValues.length; i++) {
                   csv += [result1D.paramValues[i], ...OUTPUT_FIELDS.map(f => result1D.outputs[f.id]?.[i] ?? "")].join(",") + "\n";
                 }
               } else if (resultMC && mode === "montecarlo") {
-                const cols = OUTPUT_FIELDS.map(f => f.label);
+                const cols = OUTPUT_FIELDS.map(f => t(f.labelKey));
                 csv = cols.join(",") + "\n";
                 const n = resultMC.outputs[OUTPUT_FIELDS[0].id]?.length ?? 0;
                 for (let i = 0; i < n; i++) {
@@ -686,15 +698,15 @@ export function DesignExplorer(props: ExplorerProps) {
               }
             }}
           >
-            📋 Copy CSV
+            {t("copy_csv")}
           </button>
         )}
       </div>
 
       {/* Progress bar */}
       {running && (
-        <div className="h-1 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${progress * 100}%`, background: COL.accent }} />
+        <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+          <div className="h-full rounded-full transition-all" style={{ width: `${progress * 100}%`, background: COL.accent, boxShadow: "0 0 10px rgba(0,234,255,0.6)" }} />
         </div>
       )}
 
@@ -707,25 +719,24 @@ export function DesignExplorer(props: ExplorerProps) {
                 x: result1D.paramValues,
                 y: result1D.outputs[outputField] ?? [],
                 color: COL.accent,
-                label: OUTPUT_FIELDS.find(f => f.id === outputField)?.label ?? "",
+                label: outLabel(outputField),
               }]}
-              title={`${OUTPUT_FIELDS.find(f => f.id === outputField)?.label} vs ${getParamDef(paramX)?.label}`}
-              xLabel={`${getParamDef(paramX)?.label} (${getParamDef(paramX)?.unit})`}
-              yLabel={OUTPUT_FIELDS.find(f => f.id === outputField)?.label ?? ""}
+              title={`${outLabel(outputField)} vs ${t(getParamDef(paramX).labelKey)}`}
+              xLabel={`${t(getParamDef(paramX).labelKey)} (${paramUnit(getParamDef(paramX))})`}
+              yLabel={outLabel(outputField)}
               width={600} height={280}
             />
 
-            {/* Multi-output overlay */}
             <LineChart
               data={OUTPUT_FIELDS.slice(0, 5).map((f, i) => ({
                 x: result1D.paramValues,
                 y: result1D.outputs[f.id] ?? [],
                 color: colors[i % colors.length],
-                label: f.label,
+                label: t(f.labelKey),
               }))}
-              title="All Outputs"
-              xLabel={`${getParamDef(paramX)?.label} (${getParamDef(paramX)?.unit})`}
-              yLabel="Value"
+              title={t("all_outputs")}
+              xLabel={`${t(getParamDef(paramX).labelKey)} (${paramUnit(getParamDef(paramX))})`}
+              yLabel={t("value")}
               width={600} height={280}
             />
           </div>
@@ -736,9 +747,9 @@ export function DesignExplorer(props: ExplorerProps) {
             xValues={result2D.xValues}
             yValues={result2D.yValues}
             data={result2D.outputs[outputField] ?? []}
-            title={`${OUTPUT_FIELDS.find(f => f.id === outputField)?.label}`}
-            xLabel={`${getParamDef(paramX)?.label} (${getParamDef(paramX)?.unit})`}
-            yLabel={`${getParamDef(paramY)?.label} (${getParamDef(paramY)?.unit})`}
+            title={outLabel(outputField)}
+            xLabel={`${t(getParamDef(paramX).labelKey)} (${paramUnit(getParamDef(paramX))})`}
+            yLabel={`${t(getParamDef(paramY).labelKey)} (${paramUnit(getParamDef(paramY))})`}
             width={500} height={400}
           />
         )}
@@ -747,20 +758,20 @@ export function DesignExplorer(props: ExplorerProps) {
           <div className="flex flex-col gap-4">
             <Histogram
               values={resultMC.outputs[outputField] ?? []}
-              title={`${OUTPUT_FIELDS.find(f => f.id === outputField)?.label} Distribution (n=${nSamples})`}
+              title={`${outLabel(outputField)} — ${t("distribution")} (n=${nSamples})`}
               width={500} height={200}
             />
 
             <div className="grid grid-cols-3 gap-3">
               {Object.entries(resultMC.stats).slice(0, 6).map(([key, st]) => (
-                <div key={key} className="p-2 rounded-lg" style={{ background: COL.card, border: `1px solid ${COL.border}` }}>
-                  <div className="text-[9px] font-semibold" style={{ color: COL.textDim }}>
-                    {OUTPUT_FIELDS.find(f => f.id === key)?.label}
+                <div key={key} className="p-2.5 rounded-lg" style={{ background: COL.card, border: `1px solid ${COL.border}` }}>
+                  <div className="text-[11px] font-semibold" style={{ color: COL.textMid }}>
+                    {outLabel(key)}
                   </div>
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1 text-[9px]">
-                    <span style={{ color: COL.textDim }}>Mean:</span>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1 text-[11px]">
+                    <span style={{ color: COL.textDim }}>{t("mean")}:</span>
                     <span className="tabular-nums text-right" style={{ color: COL.text }}>{st.mean.toFixed(2)}</span>
-                    <span style={{ color: COL.textDim }}>Std:</span>
+                    <span style={{ color: COL.textDim }}>{t("std")}:</span>
                     <span className="tabular-nums text-right" style={{ color: COL.text }}>{st.std.toFixed(2)}</span>
                     <span style={{ color: COL.textDim }}>P5–P95:</span>
                     <span className="tabular-nums text-right" style={{ color: COL.text }}>{st.p5.toFixed(1)}–{st.p95.toFixed(1)}</span>
@@ -774,14 +785,14 @@ export function DesignExplorer(props: ExplorerProps) {
         {mode === "sensitivity" && resultSens && (
           <div className="flex flex-col gap-4">
             <SensitivityBars
-              params={resultSens.params.map(p => getParamDef(p)?.label ?? p)}
+              params={resultSens.params.map(p => t(getParamDef(p).labelKey))}
               indices={resultSens.indices[outputField] ?? []}
-              title={`Sensitivity: ${OUTPUT_FIELDS.find(f => f.id === outputField)?.label}`}
+              title={`${t("sensitivity_of")}: ${outLabel(outputField)}`}
               width={500} height={SWEEP_PARAMS.length * 28 + 40}
             />
 
-            <div className="text-[9px]" style={{ color: COL.textDim }}>
-              Morris screening method · Normalized elementary effects · {10} repetitions
+            <div className="text-[11px]" style={{ color: COL.textDim }}>
+              {t("sensitivity_footnote", { n: 10 })}
             </div>
           </div>
         )}
@@ -789,8 +800,8 @@ export function DesignExplorer(props: ExplorerProps) {
         {/* Empty state */}
         {!running && !result1D && !result2D && !resultMC && !resultSens && (
           <div className="flex items-center justify-center h-48">
-            <span className="text-[11px]" style={{ color: COL.textDim }}>
-              Configure parameters and click Run to explore the design space
+            <span className="text-[13px]" style={{ color: COL.textMid }}>
+              {t("explorer_hint")}
             </span>
           </div>
         )}

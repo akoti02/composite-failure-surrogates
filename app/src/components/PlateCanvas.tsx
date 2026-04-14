@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { PLATE_LENGTH, PLATE_WIDTH, DEFECT_COLORS, COL } from "../lib/constants";
 import type { DefectParams } from "../lib/types";
+import { useT } from "../lib/i18n";
 
 interface Props {
   nDefects: number;
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) {
+  const t = useT();
+  const unitMPa = t("unit_mpa");
   const mx = 50, my = 28;
   const pw = 300, ph = 150;
   const sx = pw / PLATE_LENGTH;
@@ -54,7 +57,7 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
     });
     arrows.push(
       <text key="plx" x={cx(pressureX > 0 ? 0 : PLATE_LENGTH) + (pressureX > 0 ? -len - 4 : len + 4)} y={cy(PLATE_WIDTH * 0.5) - 6}
-        fill="#60a5fa" fontSize={8} textAnchor="middle" opacity={0.8}>{Math.abs(pressureX)} MPa</text>
+        fill="#60a5fa" fontSize={8} textAnchor="middle" opacity={0.8}>{Math.abs(pressureX)} {unitMPa}</text>
     );
   }
   if (pressureY !== 0) {
@@ -71,7 +74,7 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
     });
     arrows.push(
       <text key="ply" x={cx(PLATE_LENGTH * 0.5) + 30} y={cy(pressureY > 0 ? 0 : PLATE_WIDTH) + (pressureY > 0 ? -len + 2 : len + 10)}
-        fill="#60a5fa" fontSize={8} textAnchor="middle" opacity={0.8}>{Math.abs(pressureY)} MPa</text>
+        fill="#60a5fa" fontSize={8} textAnchor="middle" opacity={0.8}>{Math.abs(pressureY)} {unitMPa}</text>
     );
   }
 
@@ -190,12 +193,12 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
       {defectShapes}
 
       {/* Axis labels */}
-      <text x={cx(PLATE_LENGTH / 2)} y={cy(PLATE_WIDTH) + 18} fill={COL.textDim} fontSize={8} textAnchor="middle">
-        x (mm)
+      <text x={cx(PLATE_LENGTH / 2)} y={cy(PLATE_WIDTH) + 18} fill={COL.textDim} fontSize={9} textAnchor="middle">
+        {t("axis_x")}
       </text>
-      <text x={cx(0) - 20} y={cy(PLATE_WIDTH / 2)} fill={COL.textDim} fontSize={8} textAnchor="middle"
+      <text x={cx(0) - 20} y={cy(PLATE_WIDTH / 2)} fill={COL.textDim} fontSize={9} textAnchor="middle"
         transform={`rotate(-90 ${cx(0) - 20} ${cy(PLATE_WIDTH / 2)})`}>
-        y (mm)
+        {t("axis_y")}
       </text>
     </svg>
   );

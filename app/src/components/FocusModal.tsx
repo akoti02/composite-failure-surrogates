@@ -54,22 +54,22 @@ export function FocusModal({ open, onClose, children, title }: Props) {
       >
         {/* Modal header */}
         <div
-          className="shrink-0 h-10 flex items-center px-4 gap-3"
+          className="shrink-0 h-11 flex items-center px-4 gap-3"
           style={{
             background: COL.bgDark,
             borderBottom: `1px solid ${COL.border}`,
           }}
         >
           {title && (
-            <span className="text-[11px] font-semibold tracking-wide" style={{ color: COL.textMid }}>
+            <span className="text-[13px] font-semibold tracking-wide" style={{ color: COL.text }}>
               {title}
             </span>
           )}
           <button
-            className="ml-auto w-7 h-7 flex items-center justify-center rounded-md btn-press"
+            className="ml-auto w-8 h-8 flex items-center justify-center rounded-md btn-press"
             style={{ color: COL.textDim, border: `1px solid ${COL.border}` }}
             onClick={onClose}
-            aria-label="Close modal"
+            aria-label="Close"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />

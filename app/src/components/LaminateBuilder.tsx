@@ -5,6 +5,7 @@ import {
   parseLaminateCode, expandPlies, analyzeLaminate, progressiveFailure,
   LAMINATE_PRESETS, type PlyDef, type ABDResult, type PlyResult,
 } from "../lib/clt";
+import { useT } from "../lib/i18n";
 
 /** Polar plot of stiffness for laminate visualization */
 function StiffnessPolar({ abd }: { abd: ABDResult }) {
@@ -63,6 +64,7 @@ function StiffnessPolar({ abd }: { abd: ABDResult }) {
 function PlyStackViz({ plies, materials, results }: {
   plies: PlyDef[]; materials: Record<string, MaterialProperties>; results?: PlyResult[];
 }) {
+  const t = useT();
   const n = plies.length;
   if (n === 0) return null;
 
@@ -80,8 +82,8 @@ function PlyStackViz({ plies, materials, results }: {
 
   return (
     <div>
-      <div className="text-[10px] font-semibold mb-1" style={{ color: COL.textMid }}>
-        Ply Stack ({n} plies, {(plies.reduce((s, p) => s + (p.thickness ?? materials[p.materialId]?.plyThickness ?? 0.125), 0)).toFixed(2)} mm)
+      <div className="text-[12px] font-semibold mb-1" style={{ color: COL.textMid }}>
+        {t("ply_stack")} ({n} {t("plies")}, {(plies.reduce((s, p) => s + (p.thickness ?? materials[p.materialId]?.plyThickness ?? 0.125), 0)).toFixed(2)} {t("unit_mm")})
       </div>
       <svg width="100%" viewBox={`0 0 ${w} ${totalH + 4}`} style={{ maxWidth: w }}>
         {plies.map((ply, i) => {
@@ -201,6 +203,7 @@ function ABDDisplay({ abd }: { abd: ABDResult }) {
 
 /** Progressive failure curve */
 function FailureCurve({ curve }: { curve: { loadFactor: number; maxFI: number; failedPlies: number }[] }) {
+  const t = useT();
   const w = 360, h = 160;
   const mx = 40, my = 20;
   const pw = w - mx * 2, ph = h - my * 2;
@@ -252,8 +255,8 @@ function FailureCurve({ curve }: { curve: { loadFactor: number; maxFI: number; f
       )}
 
       {/* Axes labels */}
-      <text x={w / 2} y={h - 2} fill={COL.textDim} fontSize={9} textAnchor="middle">Load Factor (multiplier on applied Nx/Ny/Nxy)</text>
-      <text x={8} y={h / 2} fill={COL.textDim} fontSize={9} textAnchor="middle" transform={`rotate(-90, 8, ${h / 2})`}>Max Failure Index (≥1.0 = failure)</text>
+      <text x={w / 2} y={h - 2} fill={COL.textDim} fontSize={10} textAnchor="middle">{t("load_factor_axis")}</text>
+      <text x={8} y={h / 2} fill={COL.textDim} fontSize={10} textAnchor="middle" transform={`rotate(-90, 8, ${h / 2})`}>{t("max_fi_axis")}</text>
 
       {/* Tick labels */}
       {[0, 0.5, 1, 1.5, 2].map(lf => (
@@ -273,6 +276,7 @@ interface LaminateBuilderProps {
 }
 
 export function LaminateBuilder(props: LaminateBuilderProps) {
+  const t = useT();
   const [internalCode, setInternalCode] = useState("[0/±45/90]s");
   const [internalMatId, setInternalMatId] = useState(DEFAULT_MATERIAL_ID);
 
@@ -314,9 +318,9 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
   }, [laminateCode, materialId, Nx, Ny, Nxy, Mx, My, Mxy, materials, showProgressive]);
 
   const tabs = [
-    { id: "stiffness" as const, label: "Stiffness" },
-    { id: "stress" as const, label: "Ply Stress" },
-    { id: "failure" as const, label: "Failure" },
+    { id: "stiffness" as const, label: t("tab_stiffness") },
+    { id: "stress" as const,    label: t("tab_ply_stress") },
+    { id: "failure" as const,   label: t("tab_failure") },
   ];
 
   return (
@@ -324,41 +328,41 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
       {/* Top controls */}
       <div className="flex gap-3 items-end flex-wrap">
         <div className="flex flex-col gap-1">
-          <label className="text-[10px]" style={{ color: COL.textDim }}>Laminate Code</label>
+          <label className="text-[12px]" style={{ color: COL.textMid }}>{t("laminate_code")}</label>
           <input
-            className="text-[12px] font-mono px-2.5 py-1.5 rounded-md outline-none w-48"
+            className="text-[14px] font-mono px-3 py-2 rounded-md outline-none w-56"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             value={laminateCode}
             onChange={(e) => setLaminateCode(e.target.value)}
             placeholder="[0/±45/90]s"
-            aria-label="Laminate code"
-            data-tooltip="Syntax: [angle/angle/...]s — ± means both +/- angles, s = symmetric. Examples: [0/90]s, [0/±45/90]s, [45/-45]2s"
+            aria-label={t("laminate_code")}
+            data-tooltip={t("laminate_tooltip_code")}
           />
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px]" style={{ color: COL.textDim }}>Material</label>
+          <label className="text-[12px]" style={{ color: COL.textMid }}>{t("material")}</label>
           <select
-            className="text-[11px] px-2 py-1.5 rounded-md outline-none"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.textMid }}
+            className="text-[13px] px-2.5 py-2 rounded-md outline-none"
+            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             value={materialId}
             onChange={(e) => setMaterialId(e.target.value)}
           >
             {Object.keys(materials).map(id => (
-              <option key={id} value={id}>{id}{id !== "T300/5208" ? " (analytical only)" : ""}</option>
+              <option key={id} value={id}>{id}{id !== "T300/5208" ? ` (${t("analytical_only")})` : ""}</option>
             ))}
           </select>
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[10px]" style={{ color: COL.textDim }}>Preset</label>
+          <label className="text-[12px]" style={{ color: COL.textMid }}>{t("preset")}</label>
           <select
-            className="text-[11px] px-2 py-1.5 rounded-md outline-none"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.textMid }}
+            className="text-[13px] px-2.5 py-2 rounded-md outline-none"
+            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             value=""
             onChange={(e) => { if (e.target.value) setLaminateCode(LAMINATE_PRESETS[e.target.value]); e.target.value = ""; }}
           >
-            <option value="" disabled>Select preset...</option>
+            <option value="" disabled>{t("select_preset")}</option>
             {Object.entries(LAMINATE_PRESETS).map(([name, code]) => (
               <option key={name} value={name}>{name} → {code}</option>
             ))}
@@ -366,8 +370,8 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
         </div>
 
         {analysis && (
-          <div className="text-[10px] ml-auto" style={{ color: COL.textDim }}>
-            {analysis.plies.length} plies · {analysis.result.abd.totalThickness.toFixed(2)} mm
+          <div className="text-[12px] ml-auto" style={{ color: COL.textMid }}>
+            {analysis.plies.length} {t("plies")} · {analysis.result.abd.totalThickness.toFixed(2)} {t("unit_mm")}
           </div>
         )}
       </div>
@@ -375,38 +379,38 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
       {/* Loads */}
       <div className="grid grid-cols-6 gap-2">
         <div className="flex flex-col gap-0.5">
-          <label className="text-[9px]" style={{ color: COL.textDim }}>Nx (N/mm)</label>
-          <input className="text-[11px] px-2 py-1 rounded-md outline-none tabular-nums"
+          <label className="text-[11px]" style={{ color: COL.textDim }}>Nx ({t("unit_n_per_mm")})</label>
+          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             type="number" value={Nx} onChange={(e) => setNx(Number(e.target.value))} />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[9px]" style={{ color: COL.textDim }}>Ny (N/mm)</label>
-          <input className="text-[11px] px-2 py-1 rounded-md outline-none tabular-nums"
+          <label className="text-[11px]" style={{ color: COL.textDim }}>Ny ({t("unit_n_per_mm")})</label>
+          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             type="number" value={Ny} onChange={(e) => setNy(Number(e.target.value))} />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[9px]" style={{ color: COL.textDim }}>Nxy (N/mm)</label>
-          <input className="text-[11px] px-2 py-1 rounded-md outline-none tabular-nums"
+          <label className="text-[11px]" style={{ color: COL.textDim }}>Nxy ({t("unit_n_per_mm")})</label>
+          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             type="number" value={Nxy} onChange={(e) => setNxy(Number(e.target.value))} />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[9px]" style={{ color: COL.textDim }}>Mx (N·mm/mm)</label>
-          <input className="text-[11px] px-2 py-1 rounded-md outline-none tabular-nums"
+          <label className="text-[11px]" style={{ color: COL.textDim }}>Mx ({t("unit_n_mm_per_mm")})</label>
+          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             type="number" value={Mx} onChange={(e) => setMx(Number(e.target.value))} />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[9px]" style={{ color: COL.textDim }}>My (N·mm/mm)</label>
-          <input className="text-[11px] px-2 py-1 rounded-md outline-none tabular-nums"
+          <label className="text-[11px]" style={{ color: COL.textDim }}>My ({t("unit_n_mm_per_mm")})</label>
+          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             type="number" value={My} onChange={(e) => setMy(Number(e.target.value))} />
         </div>
         <div className="flex flex-col gap-0.5">
-          <label className="text-[9px]" style={{ color: COL.textDim }}>Mxy (N·mm/mm)</label>
-          <input className="text-[11px] px-2 py-1 rounded-md outline-none tabular-nums"
+          <label className="text-[11px]" style={{ color: COL.textDim }}>Mxy ({t("unit_n_mm_per_mm")})</label>
+          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
             style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
             type="number" value={Mxy} onChange={(e) => setMxy(Number(e.target.value))} />
         </div>
@@ -414,30 +418,31 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
 
       {/* Analysis tabs */}
       <div className="flex gap-1 border-b" style={{ borderColor: COL.border }}>
-        {tabs.map(t => (
+        {tabs.map(tab => (
           <button
-            key={t.id}
-            className="px-3 py-1.5 text-[11px] font-semibold transition-colors"
+            key={tab.id}
+            className="px-3.5 py-2 text-[13px] font-semibold transition-colors"
             style={{
-              color: analysisTab === t.id ? COL.accent : COL.textDim,
-              borderBottom: analysisTab === t.id ? `2px solid ${COL.accent}` : "2px solid transparent",
+              color: analysisTab === tab.id ? COL.accent : COL.textDim,
+              borderBottom: analysisTab === tab.id ? `2px solid ${COL.accent}` : "2px solid transparent",
+              textShadow: analysisTab === tab.id ? "0 0 8px rgba(0,234,255,0.4)" : undefined,
             }}
-            onClick={() => setAnalysisTab(t.id)}
+            onClick={() => setAnalysisTab(tab.id)}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
-        <label className="ml-auto flex items-center gap-1.5 text-[10px] cursor-pointer" style={{ color: COL.textDim }}>
-          <input type="checkbox" checked={showProgressive} onChange={(e) => setShowProgressive(e.target.checked)} className="accent-indigo-500" />
-          Progressive failure
+        <label className="ml-auto flex items-center gap-1.5 text-[12px] cursor-pointer" style={{ color: COL.textMid }}>
+          <input type="checkbox" checked={showProgressive} onChange={(e) => setShowProgressive(e.target.checked)} style={{ accentColor: COL.accent }} />
+          {t("progressive_failure")}
         </label>
       </div>
 
       {/* Analysis content */}
       {!analysis ? (
         <div className="flex-1 flex items-center justify-center">
-          <span className="text-[11px]" style={{ color: COL.textDim }}>
-            Enter a valid laminate code (e.g., [0/±45/90]s)
+          <span className="text-[13px]" style={{ color: COL.textMid }}>
+            {t("laminate_invalid")}
           </span>
         </div>
       ) : (
@@ -449,7 +454,7 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
                   <ABDDisplay abd={analysis.result.abd} />
                 </div>
                 <div className="shrink-0 flex flex-col items-center gap-1">
-                  <div className="text-[10px] font-semibold" style={{ color: COL.textMid }}>Stiffness Polar</div>
+                  <div className="text-[12px] font-semibold" style={{ color: COL.textMid }}>{t("stiffness_polar")}</div>
                   <StiffnessPolar abd={analysis.result.abd} />
                 </div>
               </div>
@@ -460,11 +465,11 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
           {analysisTab === "stress" && (
             <div className="flex flex-col gap-4">
               <div>
-                <div className="text-[10px] font-semibold mb-2" style={{ color: COL.textMid }}>
-                  Ply Stresses (Material Axes)
+                <div className="text-[12px] font-semibold mb-2" style={{ color: COL.textMid }}>
+                  {t("ply_stresses_title")}
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[10px]" style={{ borderCollapse: "separate", borderSpacing: "0 1px" }}>
+                  <table className="w-full text-[12px]" style={{ borderCollapse: "separate", borderSpacing: "0 1px" }}>
                     <thead>
                       <tr style={{ color: COL.textDim }}>
                         <th className="text-left px-2 py-1">#</th>
@@ -473,8 +478,8 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
                         <th className="text-right px-2">σ₂</th>
                         <th className="text-right px-2">τ₁₂</th>
                         <th className="text-right px-2">Tsai-Wu</th>
-                        <th className="text-right px-2">Max σ</th>
-                        <th className="text-center px-2">Status</th>
+                        <th className="text-right px-2">max σ</th>
+                        <th className="text-center px-2">{t("status_col")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -496,9 +501,9 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
                           </td>
                           <td className="text-center px-2">
                             {p.failed ? (
-                              <span style={{ color: COL.danger, fontSize: 9 }}>{p.failureMode}</span>
+                              <span style={{ color: COL.danger, fontSize: 11 }}>{p.failureMode}</span>
                             ) : (
-                              <span style={{ color: COL.success }}>OK</span>
+                              <span style={{ color: COL.success }}>{t("ok_status")}</span>
                             )}
                           </td>
                         </tr>
@@ -506,9 +511,9 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
                     </tbody>
                   </table>
                 </div>
-                <div className="mt-2 text-[10px] flex gap-4 flex-wrap" style={{ color: COL.textDim }}>
+                <div className="mt-2 text-[12px] flex gap-4 flex-wrap" style={{ color: COL.textDim }}>
                   <span>ε₀: [{analysis.result.midplaneStrain.map(v => v.toExponential(3)).join(", ")}]</span>
-                  <span>κ: [{analysis.result.midplaneCurvature.map(v => v.toExponential(3)).join(", ")}] /mm</span>
+                  <span>κ: [{analysis.result.midplaneCurvature.map(v => v.toExponential(3)).join(", ")}] /{t("unit_mm")}</span>
                 </div>
               </div>
               <PlyStackViz plies={analysis.plies} materials={materials} results={analysis.result.plies} />
@@ -524,65 +529,68 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
                     : COL.safeBg,
                   border: `1px solid ${COL.border}`,
                 }}>
-                  <div className="text-[9px]" style={{ color: COL.textDim }}>First Ply Failure</div>
-                  <div className="text-[16px] font-bold tabular-nums" style={{
+                  <div className="text-[11px]" style={{ color: COL.textDim }}>{t("first_ply_failure")}</div>
+                  <div className="text-[18px] font-bold tabular-nums" style={{
                     color: analysis.result.firstPlyFailure
                       ? analysis.result.firstPlyFailure.load < 1 ? COL.danger : COL.warning
                       : COL.success,
+                    textShadow: `0 0 8px ${(analysis.result.firstPlyFailure ? (analysis.result.firstPlyFailure.load < 1 ? COL.danger : COL.warning) : COL.success)}77`,
                   }}>
                     {analysis.result.firstPlyFailure
                       ? `${analysis.result.firstPlyFailure.load.toFixed(3)}×`
-                      : "No failure"}
+                      : t("no_failure")}
                   </div>
                   {analysis.result.firstPlyFailure && (
-                    <div className="text-[9px] mt-0.5" style={{ color: COL.textDim }}>
-                      Ply {analysis.result.firstPlyFailure.plyIndex + 1} · {analysis.result.firstPlyFailure.mode}
+                    <div className="text-[11px] mt-0.5" style={{ color: COL.textDim }}>
+                      {t("ply")} {analysis.result.firstPlyFailure.plyIndex + 1} · {analysis.result.firstPlyFailure.mode}
                     </div>
                   )}
                 </div>
 
                 <div className="p-3 rounded-lg" style={{ background: COL.card, border: `1px solid ${COL.border}` }}>
-                  <div className="text-[9px]" style={{ color: COL.textDim }}>Last Ply Failure</div>
-                  <div className="text-[16px] font-bold tabular-nums" style={{ color: COL.text }}>
+                  <div className="text-[11px]" style={{ color: COL.textDim }}>{t("last_ply_failure")}</div>
+                  <div className="text-[18px] font-bold tabular-nums" style={{ color: COL.text }}>
                     {analysis.result.lastPlyFailure ? `${analysis.result.lastPlyFailure.load.toFixed(3)}×` : "--"}
                   </div>
-                  <div className="text-[9px] mt-0.5" style={{ color: COL.textDim }}>
-                    FPF/LPF ratio: {analysis.result.firstPlyFailure && analysis.result.lastPlyFailure
+                  <div className="text-[11px] mt-0.5" style={{ color: COL.textDim }}>
+                    {t("fpf_lpf_ratio")}: {analysis.result.firstPlyFailure && analysis.result.lastPlyFailure
                       ? (analysis.result.lastPlyFailure.load / analysis.result.firstPlyFailure.load).toFixed(2)
                       : "--"}
                   </div>
                 </div>
 
                 <div className="p-3 rounded-lg" style={{ background: COL.card, border: `1px solid ${COL.border}` }}>
-                  <div className="text-[9px]" style={{ color: COL.textDim }}>Failed Plies</div>
-                  <div className="text-[16px] font-bold tabular-nums" style={{
+                  <div className="text-[11px]" style={{ color: COL.textDim }}>{t("failed_plies")}</div>
+                  <div className="text-[18px] font-bold tabular-nums" style={{
                     color: analysis.result.plies.some(p => p.failed) ? COL.danger : COL.success,
+                    textShadow: `0 0 8px ${(analysis.result.plies.some(p => p.failed) ? COL.danger : COL.success)}77`,
                   }}>
                     {analysis.result.plies.filter(p => p.failed).length} / {analysis.result.plies.length}
                   </div>
-                  <div className="text-[9px] mt-0.5" style={{ color: COL.textDim }}>
-                    at applied load
+                  <div className="text-[11px] mt-0.5" style={{ color: COL.textDim }}>
+                    {t("at_applied_load")}
                   </div>
                 </div>
               </div>
 
               {/* Hashin modes bar chart */}
               <div>
-                <div className="text-[10px] font-semibold mb-2" style={{ color: COL.textMid }}>Hashin Damage Mode Peak Indices</div>
-                {["Fibre Tension", "Fibre Compression", "Matrix Tension", "Matrix Compression"].map((mode, mi) => {
+                <div className="text-[12px] font-semibold mb-2" style={{ color: COL.textMid }}>{t("hashin_damage_peaks")}</div>
+                {[t("fibre_tension"), t("fibre_compression"), t("matrix_tension"), t("matrix_compression")].map((mode, mi) => {
                   const keys: (keyof PlyResult)[] = ["hashinFT", "hashinFC", "hashinMT", "hashinMC"];
                   const maxVal = Math.max(...analysis.result.plies.map(p => p[keys[mi]] as number));
                   const pct = Math.min(maxVal / 1.5, 1) * 100;
                   return (
-                    <div key={mode} className="flex items-center gap-2 h-7">
-                      <span className="text-[10px] w-32 shrink-0" style={{ color: COL.textDim }}>{mode}</span>
-                      <div className="flex-1 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <div key={mode} className="flex items-center gap-2 h-8">
+                      <span className="text-[12px] w-48 shrink-0" style={{ color: COL.textMid }}>{mode}</span>
+                      <div className="flex-1 h-2 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
                         <div className="h-full rounded-full transition-all" style={{
                           width: `${pct}%`,
                           background: maxVal >= 1 ? COL.danger : maxVal >= 0.8 ? COL.warning : COL.accent,
+                          boxShadow: `0 0 8px ${maxVal >= 1 ? COL.danger : maxVal >= 0.8 ? COL.warning : COL.accent}77`,
                         }} />
                       </div>
-                      <span className="text-[10px] tabular-nums w-12 text-right" style={{
+                      <span className="text-[13px] tabular-nums w-14 text-right font-semibold" style={{
                         color: maxVal >= 1 ? COL.danger : COL.text,
                       }}>
                         {maxVal.toFixed(3)}
@@ -595,8 +603,8 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
               {/* Progressive failure curve */}
               {analysis.progCurve && (
                 <div>
-                  <div className="text-[10px] font-semibold mb-1" style={{ color: COL.textMid }}>
-                    Progressive Failure Envelope (Camanho Degradation)
+                  <div className="text-[12px] font-semibold mb-1" style={{ color: COL.textMid }}>
+                    {t("progressive_envelope")}
                   </div>
                   <FailureCurve curve={analysis.progCurve} />
                 </div>

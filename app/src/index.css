@@ -1,22 +1,32 @@
 @import "tailwindcss";
 
+/* Base font size bumped from browser-default 16px to 17px so every rem
+   unit is ~6% larger, and tailwind fixed-px text utilities get an extra
+   bit of breathing room via the 'lg:*' multiplier where we set them. */
+html {
+  font-size: 17px;
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #111113;
-  color: #ededef;
+  background: #16161d;
+  color: #fafaff;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;              /* default size used by .text-base */
+  letter-spacing: 0.005em;
 }
 
-/* Subtle mesh background gradient */
+/* Luminescent mesh background — subtle neon auroras over a warmer-dark base */
 #root {
   background:
-    radial-gradient(ellipse at 15% 80%, rgba(99, 102, 241, 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 20%, rgba(139, 92, 246, 0.025) 0%, transparent 50%),
-    #111113;
+    radial-gradient(ellipse at 12% 85%, rgba(0, 234, 255, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 88% 15%, rgba(183, 148, 255, 0.055) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(94, 255, 176, 0.025) 0%, transparent 70%),
+    #16161d;
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -26,35 +36,57 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] { -moz-appearance: textfield; }
 
-/* Focus ring on number inputs */
+/* Focus ring on number inputs — cyan glow */
 input[type="number"]:focus {
-  background: rgba(99, 102, 241, 0.06) !important;
+  background: rgba(0, 234, 255, 0.07) !important;
+  box-shadow: 0 0 0 2px rgba(0, 234, 255, 0.25), 0 0 14px rgba(0, 234, 255, 0.25);
 }
 input[type="number"]:focus-visible {
   outline: none;
 }
 
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+::-webkit-scrollbar-thumb { background: rgba(0, 234, 255, 0.18); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 234, 255, 0.35); }
 
 .selectable { user-select: text; }
 
-/* ── Global focus-visible for keyboard navigation ── */
+/* ── Global focus-visible — cyan glow ── */
 button:focus-visible,
 select:focus-visible,
 [role="tab"]:focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.7);
+  outline: 2px solid rgba(0, 234, 255, 0.75);
   outline-offset: 2px;
   border-radius: 6px;
+  box-shadow: 0 0 16px rgba(0, 234, 255, 0.35);
 }
 
 /* ── Pass/Fail with icons (accessibility: not colour-only) ── */
 .verdict-pass::before { content: "✓ "; }
 .verdict-fail::before { content: "✗ "; }
 
-/* ── Tooltips (glass style) ── */
+/* ── Luminescent utility — apply a cyan halo glow ── */
+.glow-cyan {
+  box-shadow: 0 0 16px rgba(0, 234, 255, 0.35), 0 0 4px rgba(0, 234, 255, 0.7);
+}
+.glow-cyan-soft {
+  box-shadow: 0 0 10px rgba(0, 234, 255, 0.22);
+}
+.text-glow-cyan {
+  text-shadow: 0 0 8px rgba(0, 234, 255, 0.6);
+}
+.text-glow-pink {
+  text-shadow: 0 0 8px rgba(255, 94, 135, 0.6);
+}
+.text-glow-mint {
+  text-shadow: 0 0 8px rgba(94, 255, 176, 0.5);
+}
+.text-glow-amber {
+  text-shadow: 0 0 8px rgba(255, 216, 77, 0.55);
+}
+
+/* ── Tooltips (glass style) — slightly larger font ── */
 [data-tooltip] { position: relative; }
 [data-tooltip]:hover::after {
   content: attr(data-tooltip);
@@ -62,21 +94,21 @@ select:focus-visible,
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(20, 20, 26, 0.85);
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
-  color: #ededef;
-  padding: 6px 10px;
+  background: rgba(20, 20, 30, 0.92);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  color: #fafaff;
+  padding: 7px 11px;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 12px;
   z-index: 100;
   pointer-events: none;
-  line-height: 1.4;
-  max-width: 240px;
+  line-height: 1.45;
+  max-width: 280px;
   white-space: normal;
   text-align: center;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  border: 1px solid rgba(0, 234, 255, 0.22);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 234, 255, 0.12);
   animation: tooltipIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -104,16 +136,19 @@ select:focus-visible,
 }
 
 @keyframes failPulse {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.15), 0 0 20px -5px rgba(248, 113, 113, 0.1); }
-  50% { box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.35), 0 0 30px -3px rgba(248, 113, 113, 0.2); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255, 94, 135, 0.25), 0 0 22px -3px rgba(255, 94, 135, 0.25); }
+  50% { box-shadow: 0 0 0 1px rgba(255, 94, 135, 0.55), 0 0 38px -2px rgba(255, 94, 135, 0.45); }
 }
 .verdict-fail-pulse { animation: failPulse 2.5s ease-in-out infinite; }
 
 @keyframes warnPulse {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.15); }
-  50% { box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.3), 0 0 20px -3px rgba(251, 191, 36, 0.12); }
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255, 216, 77, 0.22); }
+  50% { box-shadow: 0 0 0 1px rgba(255, 216, 77, 0.45), 0 0 26px -2px rgba(255, 216, 77, 0.32); }
 }
 .verdict-warn-pulse { animation: warnPulse 2.5s ease-in-out infinite; }
+
+/* Safe glow (constant) */
+.verdict-safe-glow { box-shadow: 0 0 26px -5px rgba(94, 255, 176, 0.35); }
 
 /* ── SVG check/X drawing ── */
 @keyframes drawCircle {
@@ -154,15 +189,17 @@ select:focus-visible,
 .dot-pulse { animation: dotPulse 1.5s ease-in-out infinite; }
 .dot-pulse-fast { animation: dotPulse 0.8s ease-in-out infinite; }
 
-/* ── Button shimmer ── */
+/* ── Button shimmer — cyan variant ── */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 .btn-shimmer {
-  background: linear-gradient(90deg, #6366f1 0%, #818cf8 25%, #6366f1 50%, #818cf8 75%, #6366f1 100%) !important;
+  background: linear-gradient(90deg, #00eaff 0%, #7fdbff 25%, #00eaff 50%, #7fdbff 75%, #00eaff 100%) !important;
   background-size: 200% 100%;
   animation: shimmer 2s linear infinite;
+  box-shadow: 0 0 18px rgba(0, 234, 255, 0.45);
+  color: #041017 !important;
 }
 
 /* ── Gauge bar fill ── */
@@ -175,20 +212,20 @@ select:focus-visible,
   animation: gaugeFill 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* ── Card surface (Raycast-inspired) ── */
+/* ── Card surface ── */
 .surface-card {
-  background: #1a1a1f;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #21212c;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 10px;
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03), 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 1px 3px rgba(0,0,0,0.22);
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
               box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
               border-color 0.15s ease;
 }
 .surface-card:hover {
   transform: translateY(-1px);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03), 0 4px 16px rgba(0,0,0,0.3);
-  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 4px 20px rgba(0,0,0,0.32), 0 0 14px rgba(0, 234, 255, 0.1);
+  border-color: rgba(0, 234, 255, 0.22);
 }
 
 /* ── Defect card enter ── */
@@ -208,7 +245,7 @@ select:focus-visible,
 }
 .btn-press:hover {
   transform: scale(1.02);
-  filter: brightness(1.1);
+  filter: brightness(1.12);
 }
 .btn-press:active {
   transform: scale(0.97) translateY(1px);
@@ -217,11 +254,12 @@ select:focus-visible,
 
 /* ── Result row hover ── */
 .result-row {
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .result-row:hover {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(0, 234, 255, 0.05) !important;
+  border-color: rgba(0, 234, 255, 0.25) !important;
+  box-shadow: 0 0 12px rgba(0, 234, 255, 0.12);
 }
 
 /* ── Stepper +/- buttons ── */
@@ -230,28 +268,29 @@ select:focus-visible,
   cursor: pointer;
 }
 .stepper-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ededef !important;
+  background: rgba(0, 234, 255, 0.1);
+  color: #fafaff !important;
 }
 .stepper-btn:active {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 234, 255, 0.18);
 }
 
 /* ── Select dropdown ── */
 select {
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 select:hover {
-  border-color: rgba(255, 255, 255, 0.14) !important;
-  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(0, 234, 255, 0.35) !important;
+  background: rgba(0, 234, 255, 0.05) !important;
 }
 select:focus-visible {
   outline: none;
-  border-color: rgba(99, 102, 241, 0.4) !important;
+  border-color: rgba(0, 234, 255, 0.6) !important;
+  box-shadow: 0 0 14px rgba(0, 234, 255, 0.3);
 }
 select option {
-  background: #1a1a1f;
-  color: #ededef;
+  background: #21212c;
+  color: #fafaff;
 }
 
 /* ── Export button fade in ── */
@@ -295,5 +334,41 @@ select option {
   transition: background 0.15s ease;
 }
 .canvas-collapse-bar:hover {
-  background: rgba(255, 255, 255, 0.03) !important;
+  background: rgba(0, 234, 255, 0.05) !important;
 }
+
+/* ── Language pill toggle ── */
+.lang-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 234, 255, 0.28);
+  background: rgba(0, 234, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+.lang-pill-btn {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: #8b8b9c;
+  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.lang-pill-btn.active {
+  background: linear-gradient(135deg, rgba(0, 234, 255, 0.18), rgba(127, 219, 255, 0.1));
+  color: #00eaff;
+  box-shadow: 0 0 10px rgba(0, 234, 255, 0.45), inset 0 0 0 1px rgba(0, 234, 255, 0.35);
+  text-shadow: 0 0 6px rgba(0, 234, 255, 0.5);
+}
+.lang-pill-btn:hover:not(.active) {
+  color: #c7c7d4;
+  background: rgba(0, 234, 255, 0.06);
+}
+
+/* ── Tabular numbers default ── */
+.tabular-nums { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }

@@ -1,5 +1,16 @@
 import type { Preset } from "./types";
 
+// Map preset names (used as keys in PRESETS) → i18n keys for display.
+// Keep internal preset names in English so they remain stable across languages
+// (localStorage autosave, comparisons, etc.); translate only at render time.
+export const PRESET_NAME_KEYS: Record<string, string> = {
+  "Single Central Crack": "preset_single_central",
+  "Biaxial Loading":      "preset_biaxial",
+  "Severe Multi-Defect":  "preset_severe_multi",
+  "Edge Crack (Critical)":"preset_edge_critical",
+  "Light Surface Damage": "preset_light_surface",
+};
+
 export const PRESETS: Record<string, Preset> = {
   "Single Central Crack": {
     n_defects: 1, pressure_x: 100.0, pressure_y: 0.0,

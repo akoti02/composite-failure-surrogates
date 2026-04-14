@@ -2,48 +2,67 @@ export const PLATE_LENGTH = 100.0; // mm
 export const PLATE_WIDTH = 50.0; // mm
 export const MAX_DEFECTS = 5;
 
-export const DEFECT_COLORS = ["#f472b6", "#38bdf8", "#a78bfa", "#fb923c", "#4ade80"];
+// Luminescent defect palette — glow-in-the-dark tones
+export const DEFECT_COLORS = ["#ff6ad5", "#00eaff", "#b794ff", "#ffb347", "#b4ff3d"];
 
+/* ────────────────────────────────────────────────────────────────────
+   LUMINESCENT PALETTE
+   Dark base with neon cyan as primary accent. Accents "glow" (have halo
+   shadows applied in index.css + inline styles). Text lifted for
+   readability against the slightly warmer/blue-tinted backdrop.
+   ──────────────────────────────────────────────────────────────────── */
 export const COL = {
-  // Layered backgrounds (Linear/Raycast pattern)
-  bg: "#111113",
-  bgDark: "#0a0a0b",
-  panel: "#161618",
-  panelAlt: "#1e1e22",
-  card: "#1a1a1f",
-  cardHover: "#222228",
-  canvasBg: "#0e0e11",
+  // Layered backgrounds — lifted from near-black to soft near-black with a cool cast
+  bg: "#16161d",
+  bgDark: "#101016",
+  panel: "#1d1d26",
+  panelAlt: "#232330",
+  card: "#21212c",
+  cardHover: "#2a2a38",
+  canvasBg: "#0f0f15",
 
-  // Accent
-  accent: "#6366f1",
-  accentMuted: "rgba(99, 102, 241, 0.15)",
-  accent2: "#818cf8",
+  // Primary accent — luminescent ice-blue / neon cyan
+  accent: "#00eaff",
+  accentMuted: "rgba(0, 234, 255, 0.15)",
+  accent2: "#7fdbff",
+  accentGlow: "0 0 16px rgba(0, 234, 255, 0.45)",
+  accentGlowSoft: "0 0 10px rgba(0, 234, 255, 0.25)",
 
-  // Semantic
-  success: "#34d399",
-  successMuted: "rgba(52, 211, 153, 0.08)",
-  warning: "#fbbf24",
-  warningMuted: "rgba(251, 191, 36, 0.08)",
-  danger: "#f87171",
-  dangerMuted: "rgba(248, 113, 113, 0.08)",
+  // Secondary luminescent hues (used selectively)
+  neonViolet: "#b794ff",
+  neonPink: "#ff6ad5",
+  neonLime: "#b4ff3d",
 
-  // Text hierarchy
-  text: "#ededef",
-  textMid: "#a0a0a8",
-  textDim: "#6b6b78", // bumped from #5a5a65 for WCAG AA contrast
+  // Semantic — all bumped to high-luminance glow-ready variants
+  success: "#5effb0",            // neon mint
+  successMuted: "rgba(94, 255, 176, 0.10)",
+  successGlow: "0 0 14px rgba(94, 255, 176, 0.35)",
+  warning: "#ffd84d",            // neon amber
+  warningMuted: "rgba(255, 216, 77, 0.10)",
+  warningGlow: "0 0 14px rgba(255, 216, 77, 0.35)",
+  danger: "#ff5e87",             // neon rose
+  dangerMuted: "rgba(255, 94, 135, 0.10)",
+  dangerGlow: "0 0 14px rgba(255, 94, 135, 0.40)",
 
-  // Borders
-  border: "rgba(255, 255, 255, 0.06)",
-  borderMed: "rgba(255, 255, 255, 0.09)",
-  borderBright: "rgba(255, 255, 255, 0.14)",
+  // Text hierarchy — brightened across the board
+  text: "#fafaff",
+  textMid: "#c7c7d4",
+  textDim: "#8b8b9c",            // was #6b6b78 — readable without being harsh
 
-  // Verdict backgrounds
-  safeBg: "rgba(52, 211, 153, 0.06)",
-  warnBg: "rgba(251, 191, 36, 0.06)",
-  critBg: "rgba(248, 113, 113, 0.06)",
+  // Borders — slightly more visible to define sections
+  border: "rgba(255, 255, 255, 0.09)",
+  borderMed: "rgba(255, 255, 255, 0.14)",
+  borderBright: "rgba(0, 234, 255, 0.35)",
+
+  // Verdict backgrounds — luminescent washes
+  safeBg: "rgba(94, 255, 176, 0.07)",
+  warnBg: "rgba(255, 216, 77, 0.07)",
+  critBg: "rgba(255, 94, 135, 0.08)",
 } as const;
 
-// Tooltips for engineering terms
+// Tooltips for engineering terms — translation keys into i18n.
+// Keep this export for backward compatibility; callers should prefer
+// `useT()` with the `tip_*` keys directly. See `i18n.ts`.
 export const TOOLTIPS: Record<string, string> = {
   pressure_x: "Applied pressure in the fibre direction (longitudinal)",
   pressure_y: "Applied pressure transverse to the fibre direction",

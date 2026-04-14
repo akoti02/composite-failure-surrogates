@@ -42,15 +42,15 @@ export function NumberInput({ label, value, onChange, unit, step = 1, min, max, 
   }, []);
 
   const isOutOfRange = (min !== undefined && value < min) || (max !== undefined && value > max);
-  const h = compact ? "h-9" : "h-10";
-  const btnW = compact ? "w-9" : "w-10";
-  const inputW = compact ? "w-[72px]" : "w-[88px]";
-  const fontSize = compact ? "text-[13px]" : "text-[15px]";
-  const labelSize = compact ? "text-[13px]" : "text-[14px]";
+  const h = compact ? "h-10" : "h-11";
+  const btnW = compact ? "w-10" : "w-11";
+  const inputW = compact ? "w-[78px]" : "w-[96px]";
+  const fontSize = compact ? "text-[15px]" : "text-[17px]";
+  const labelSize = compact ? "text-[14px]" : "text-[15px]";
 
   return (
     <div
-      className="flex items-center gap-4 px-3 py-1.5 -mx-3 rounded-lg transition-colors duration-100 hover:bg-white/[0.03]"
+      className="flex items-center gap-4 px-3 py-1.5 -mx-3 rounded-lg transition-colors duration-100 hover:bg-cyan-500/5"
       data-tooltip={tooltip}
     >
       <label className={`${labelSize} flex-1 min-w-0 truncate`} style={{ color: COL.textMid }}>
@@ -60,11 +60,11 @@ export function NumberInput({ label, value, onChange, unit, step = 1, min, max, 
         className="flex items-center rounded-lg overflow-hidden transition-all duration-150"
         style={{
           border: `1px solid ${isOutOfRange ? COL.danger : COL.border}`,
-          background: "rgba(0,0,0,0.2)",
+          background: "rgba(0,0,0,0.25)",
         }}
       >
         <button
-          className={`${btnW} ${h} flex items-center justify-center text-lg select-none transition-colors duration-100 hover:bg-white/[0.06] active:bg-white/[0.1]`}
+          className={`${btnW} ${h} flex items-center justify-center text-xl select-none stepper-btn`}
           style={{ color: COL.textMid, borderRight: `1px solid ${COL.border}` }}
           onMouseDown={() => startRepeat(-step)}
           onMouseUp={stopRepeat}
@@ -75,7 +75,7 @@ export function NumberInput({ label, value, onChange, unit, step = 1, min, max, 
         </button>
         <input
           type="number"
-          className={`${inputW} ${fontSize} text-center py-2 outline-none tabular-nums font-medium`}
+          className={`${inputW} ${fontSize} text-center py-2 outline-none tabular-nums font-semibold`}
           style={{
             background: "transparent",
             color: isOutOfRange ? COL.danger : COL.text,
@@ -89,7 +89,7 @@ export function NumberInput({ label, value, onChange, unit, step = 1, min, max, 
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
         />
         <button
-          className={`${btnW} ${h} flex items-center justify-center text-lg select-none transition-colors duration-100 hover:bg-white/[0.06] active:bg-white/[0.1]`}
+          className={`${btnW} ${h} flex items-center justify-center text-xl select-none stepper-btn`}
           style={{ color: COL.textMid, borderLeft: `1px solid ${COL.border}` }}
           onMouseDown={() => startRepeat(step)}
           onMouseUp={stopRepeat}
@@ -100,7 +100,7 @@ export function NumberInput({ label, value, onChange, unit, step = 1, min, max, 
         </button>
       </div>
       {unit && (
-        <span className="text-[12px] w-9 text-right tabular-nums" style={{ color: COL.textDim, opacity: 0.6 }}>
+        <span className="text-[13px] w-11 text-right tabular-nums" style={{ color: COL.textDim, opacity: 0.75 }}>
           {unit}
         </span>
       )}

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef, Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Header } from "./components/Header";
+import { useLang, useT } from "./lib/i18n";
+import type { TKey } from "./lib/i18n";
 
 // Error boundary to prevent white screen of death
 class ErrorBoundary extends Component<
@@ -20,15 +22,16 @@ class ErrorBoundary extends Component<
   }
   render() {
     if (this.state.hasError) {
+      // Error boundary cannot use hooks, so strings stay English here.
       return (
         <div style={{ padding: 40, color: COL.danger, background: COL.bgDark, height: "100vh", fontFamily: "monospace" }}>
-          <h2 style={{ fontSize: 18, marginBottom: 12 }}>Something went wrong</h2>
-          <p style={{ fontSize: 13, color: COL.textMid, marginBottom: 16 }}>{this.state.error}</p>
+          <h2 style={{ fontSize: 20, marginBottom: 12 }}>Something went wrong / Что-то пошло не так</h2>
+          <p style={{ fontSize: 14, color: COL.textMid, marginBottom: 16 }}>{this.state.error}</p>
           <button
             onClick={() => this.setState({ hasError: false, error: "" })}
-            style={{ padding: "8px 16px", background: COL.accent, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}
+            style={{ padding: "10px 18px", background: COL.accent, color: "#041017", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 600, boxShadow: "0 0 16px rgba(0,234,255,0.5)" }}
           >
-            Try Again
+            Try Again / Повторить
           </button>
         </div>
       );
@@ -85,52 +88,54 @@ function buildRawInputs(
 
 function formatResultsForExport(
   results: PredictionResults, nDefects: number,
+  t: (k: TKey, vars?: Record<string, string | number>) => string,
+  unitMPa: string, unitMM: string, unitDeg: string,
   pressureX?: number, pressureY?: number,
   materialKey?: string, layupKey?: string, bcMode?: string,
   defects?: DefectParams[]
 ): string {
-  const lines: string[] = ["RP3 Prediction Results", "=====================", ""];
+  const lines: string[] = [t("export_title"), "=====================", ""];
   const fmt = (v?: number) => v != null && isFinite(v) ? v.toFixed(4) : "--";
-  const fmtMPa = (v?: number) => v != null && isFinite(v) ? `${v.toFixed(2)} MPa` : "--";
+  const fmtMPa = (v?: number) => v != null && isFinite(v) ? `${v.toFixed(2)} ${unitMPa}` : "--";
+  const yn = (v?: number) => v === 1 ? t("export_yes") : v === 0 ? t("export_no") : "--";
 
-  // Include input parameters so results are reproducible
-  lines.push("Input Configuration:");
-  lines.push(`  Number of defects: ${nDefects}`);
-  if (pressureX != null) lines.push(`  Pressure X: ${pressureX} MPa`);
-  if (pressureY != null) lines.push(`  Pressure Y: ${pressureY} MPa`);
+  lines.push(`${t("export_input")}:`);
+  lines.push(`  ${t("export_n_defects")}: ${nDefects}`);
+  if (pressureX != null) lines.push(`  ${t("pressure_x")}: ${pressureX} ${unitMPa}`);
+  if (pressureY != null) lines.push(`  ${t("pressure_y")}: ${pressureY} ${unitMPa}`);
   if (materialKey) {
     const mat = MATERIAL_DB[materialKey];
-    lines.push(`  Material: ${mat?.name ?? materialKey} (id=${mat?.id ?? "?"})`);
+    lines.push(`  ${t("material")}: ${mat?.name ?? materialKey} (id=${mat?.id ?? "?"})`);
   }
   if (layupKey) {
     const layup = LAYUP_DB[layupKey];
-    lines.push(`  Layup: ${layup?.name ?? layupKey} (id=${layup?.id ?? "?"})`);
+    lines.push(`  ${t("layup")}: ${layup?.name ?? layupKey} (id=${layup?.id ?? "?"})`);
   }
-  if (bcMode) lines.push(`  BC Mode: ${bcMode}`);
+  if (bcMode) lines.push(`  ${t("export_bc_mode")}: ${bcMode}`);
   if (defects) {
     for (let i = 0; i < nDefects; i++) {
       const d = defects[i];
-      if (d) lines.push(`  Defect ${i+1}: x=${d.x}mm y=${d.y}mm len=${d.half_length*2}mm w=${d.width}mm th=${d.angle} deg`);
+      if (d) lines.push(`  ${t("defect")} ${i+1}: x=${d.x}${unitMM} y=${d.y}${unitMM} len=${d.half_length*2}${unitMM} w=${d.width}${unitMM} θ=${d.angle}${unitDeg}`);
     }
   }
   lines.push("");
 
-  lines.push("Stress Analysis:");
-  lines.push(`  Max Fibre Stress (S11):  ${fmtMPa(results.max_s11)}`);
-  lines.push(`  Min Fibre Stress (S11):  ${fmtMPa(results.min_s11)}`);
-  lines.push(`  Peak Shear (S12):        ${fmtMPa(results.max_s12)}`);
+  lines.push(`${t("export_stress")}:`);
+  lines.push(`  ${t("max_fibre_stress")}:  ${fmtMPa(results.max_s11)}`);
+  lines.push(`  ${t("min_fibre_stress")}:  ${fmtMPa(results.min_s11)}`);
+  lines.push(`  ${t("peak_shear")}:        ${fmtMPa(results.max_s12)}`);
   lines.push("");
-  lines.push("Failure Assessment:");
-  lines.push(`  Tsai-Wu Index:  ${fmt(results.tsai_wu_index)}`);
-  lines.push(`  Tsai-Wu Failed: ${results.failed_tsai_wu === 1 ? "YES" : results.failed_tsai_wu === 0 ? "NO" : "--"}`);
-  lines.push(`  Hashin Failed:  ${results.failed_hashin === 1 ? "YES" : results.failed_hashin === 0 ? "NO" : "--"}`);
-  lines.push(`  Puck Failed:    ${results.failed_puck === 1 ? "YES" : results.failed_puck === 0 ? "NO" : "--"}`);
-  lines.push(`  LaRC Failed:    ${results.failed_larc === 1 ? "YES" : results.failed_larc === 0 ? "NO" : "--"}`);
+  lines.push(`${t("export_failure_assess")}:`);
+  lines.push(`  ${t("export_tsai_wu_index")}:  ${fmt(results.tsai_wu_index)}`);
+  lines.push(`  ${t("export_tsai_wu_failed")}: ${yn(results.failed_tsai_wu)}`);
+  lines.push(`  ${t("export_hashin_failed")}:  ${yn(results.failed_hashin)}`);
+  lines.push(`  ${t("export_puck_failed")}:    ${yn(results.failed_puck)}`);
+  lines.push(`  ${t("export_larc_failed")}:    ${yn(results.failed_larc)}`);
   lines.push("");
-  lines.push("Hashin Damage Modes:");
-  lines.push(`  Fibre Tension:      ${fmt(results.max_hashin_ft)}`);
-  lines.push(`  Matrix Tension:     ${fmt(results.max_hashin_mt)}`);
-  lines.push(`  Matrix Compression: ${fmt(results.max_hashin_mc)}`);
+  lines.push(`${t("export_hashin_modes")}:`);
+  lines.push(`  ${t("fibre_tension")}:      ${fmt(results.max_hashin_ft)}`);
+  lines.push(`  ${t("matrix_tension")}:     ${fmt(results.max_hashin_mt)}`);
+  lines.push(`  ${t("matrix_compression")}: ${fmt(results.max_hashin_mc)}`);
   return lines.join("\n");
 }
 
@@ -140,9 +145,9 @@ const initDefects = (): DefectParams[] =>
 type FocusTarget = null | "canvas" | "results" | "laminate";
 type AppTab = "analysis" | "explorer";
 
-const TABS: { id: AppTab; label: string; icon: string }[] = [
-  { id: "analysis", label: "Analysis", icon: "◎" },
-  { id: "explorer", label: "Explorer", icon: "◐" },
+const TABS: { id: AppTab; labelKey: TKey; icon: string }[] = [
+  { id: "analysis", labelKey: "tab_analysis", icon: "◎" },
+  { id: "explorer", labelKey: "tab_explorer", icon: "◐" },
 ];
 
 const GITHUB_REPO = "akoti02/composite-failure-surrogates";
@@ -165,6 +170,7 @@ function compareVersions(a: string, b: string): number {
 }
 
 function UpdateBanner() {
+  const t = useT();
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
@@ -192,32 +198,34 @@ function UpdateBanner() {
 
   return (
     <div
-      className="flex items-center justify-center gap-3 text-[11px] py-1.5 px-4"
-      style={{ background: "#7c3aed22", borderBottom: "1px solid #7c3aed44", color: "#c4b5fd" }}
+      className="flex items-center justify-center gap-3 text-[12px] py-1.5 px-4"
+      style={{ background: "rgba(183,148,255,0.12)", borderBottom: "1px solid rgba(183,148,255,0.3)", color: "#e0ccff", boxShadow: "0 0 18px rgba(183,148,255,0.12)" }}
     >
-      <span>Version {release.version} is available</span>
+      <span>{t("update_available", { v: release.version })}</span>
       <button
-        className="px-3 py-0.5 rounded-md text-[11px] font-semibold cursor-pointer"
-        style={{ background: "#7c3aed", color: "#fff", border: "none" }}
+        className="px-3 py-0.5 rounded-md text-[12px] font-semibold cursor-pointer"
+        style={{ background: "#b794ff", color: "#1a0a2e", border: "none", boxShadow: "0 0 12px rgba(183,148,255,0.6)" }}
         onClick={() => import("@tauri-apps/plugin-opener").then(m => m.openUrl(release.downloadUrl)).catch(() => window.open(release.downloadUrl, "_blank"))}
       >
-        Download update
+        {t("update_download")}
       </button>
       <button
-        className="text-[11px] cursor-pointer"
-        style={{ color: "#c4b5fd80", background: "none", border: "none" }}
+        className="text-[12px] cursor-pointer"
+        style={{ color: "rgba(183,148,255,0.7)", background: "none", border: "none" }}
         onClick={() => setDismissed(true)}
       >
-        Dismiss
+        {t("update_dismiss")}
       </button>
     </div>
   );
 }
 
 function AppInner() {
+  const t = useT();
+  const { lang } = useLang();
   const [modelsReady, setModelsReady] = useState(false);
   const [modelCount, setModelCount] = useState(0);
-  const [status, setStatus] = useState("Loading models...");
+  const [status, setStatus] = useState(() => t("status_loading_models"));
   const [predicting, setPredicting] = useState(false);
   const [results, setResults] = useState<PredictionResults | null>(null);
 
@@ -241,6 +249,20 @@ function AppInner() {
   const [activePreset, setActivePreset] = useState("");
   const [showProjects, setShowProjects] = useState(false);
   const [compareSnapshots, setCompareSnapshots] = useState<AnalysisSnapshot[]>([]);
+
+  // When the user switches language, refresh the status text to the current
+  // lifecycle state (Ready/Loading). Errors and transient messages are left
+  // alone because they may not have a translation key.
+  useEffect(() => {
+    setStatus(
+      modelsReady
+        ? `${t("status_ready")} — ${modelCount} ${t("status_models_loaded")}`
+        : t("status_loading_models")
+    );
+    // We intentionally depend on `lang` (not `t`) so we only refresh on
+    // actual language switches, not every re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   // Auto-save state to localStorage so users don't lose work
   useEffect(() => {
@@ -288,20 +310,20 @@ function AppInner() {
         if (resp.ok && resp.count > 0) {
           setModelCount(resp.count);
           setModelsReady(true);
-          setStatus(`Ready — ${resp.count} models loaded`);
+          setStatus(`${t("status_ready")} — ${resp.count} ${t("status_models_loaded")}`);
         } else if (resp.ok && resp.count === 0) {
           setModelCount(0);
           setModelsReady(false);
-          setStatus("No models loaded — check sidecar");
+          setStatus(t("status_no_models"));
         } else {
-          setStatus("Model load failed");
+          setStatus(t("status_model_failed"));
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("Cannot read properties") || msg.includes("__TAURI__") || msg.includes("invoke")) {
-          setStatus("Standalone mode — no sidecar");
+          setStatus(t("status_standalone"));
         } else {
-          setStatus(`Error: ${msg.slice(0, 60)}`);
+          setStatus(`${t("status_error")}: ${msg.slice(0, 60)}`);
         }
       }
     })();
@@ -342,23 +364,23 @@ function AppInner() {
       if (gen !== generationRef.current) return; // stale — inputs changed while we were waiting
       if (resp.ok) {
         setResults(resp.results);
-        setStatus("Live");
+        setStatus(t("live"));
         if (saveToHistory) addHistoryEntry(nDefects, pressureX, pressureY, resp.results);
       } else {
-        setStatus(`Error: ${resp.error}`);
+        setStatus(`${t("status_error")}: ${resp.error}`);
       }
     } catch (e) {
       if (gen !== generationRef.current) return; // stale
       const msg = e instanceof Error ? e.message : String(e);
       console.error("Prediction failed:", msg);
-      setStatus(`Error: ${msg.slice(0, 80)}`);
+      setStatus(`${t("status_error")}: ${msg.slice(0, 80)}`);
     } finally {
       if (gen === generationRef.current) {
         predictingRef.current = false;
         setPredicting(false);
       }
     }
-  }, [modelsReady, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects]);
+  }, [modelsReady, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, t]);
 
   // Live prediction — auto-triggers on any input change (200ms debounce)
   useEffect(() => {
@@ -382,19 +404,23 @@ function AppInner() {
     setBcMode(DEFAULT_BC_MODE);
     setDefects(initDefects());
     setResults(null);
-    setStatus(modelsReady ? `Ready -- ${modelCount} models loaded` : "Loading models...");
-  }, [modelsReady, modelCount]);
+    setStatus(modelsReady ? `${t("status_ready")} — ${modelCount} ${t("status_models_loaded")}` : t("status_loading_models"));
+  }, [modelsReady, modelCount, t]);
 
   const handleExport = useCallback(() => {
     if (!results) return;
-    const text = formatResultsForExport(results, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects);
+    const text = formatResultsForExport(
+      results, nDefects, t,
+      t("unit_mpa"), t("unit_mm"), t("unit_deg"),
+      pressureX, pressureY, materialKey, layupKey, bcMode, defects,
+    );
     navigator.clipboard.writeText(text).then(() => {
-      setStatus("Results copied to clipboard");
-      setTimeout(() => setStatus("Analysis complete"), 2000);
+      setStatus(t("status_copied"));
+      setTimeout(() => setStatus(t("status_analysis_complete")), 2000);
     }).catch(() => {
-      setStatus("Clipboard write failed");
+      setStatus(t("status_copy_failed"));
     });
-  }, [results, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects]);
+  }, [results, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, t]);
 
   const handleRestoreSnapshot = useCallback((snap: AnalysisSnapshot) => {
     setActivePreset("");
@@ -483,16 +509,18 @@ function AppInner() {
             aria-selected={activeTab === tab.id}
             aria-controls={`tabpanel-${tab.id}`}
             tabIndex={activeTab === tab.id ? 0 : -1}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-t-md text-[11px] font-semibold transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-1 rounded-t-md text-[13px] font-semibold transition-all"
             style={{
               background: activeTab === tab.id ? COL.bg : "transparent",
-              color: activeTab === tab.id ? COL.text : COL.textDim,
+              color: activeTab === tab.id ? COL.accent : COL.textDim,
               borderBottom: activeTab === tab.id ? `2px solid ${COL.accent}` : "2px solid transparent",
+              textShadow: activeTab === tab.id ? "0 0 8px rgba(0,234,255,0.5)" : undefined,
+              boxShadow: activeTab === tab.id ? "0 1px 12px -2px rgba(0,234,255,0.25)" : undefined,
             }}
             onClick={() => setActiveTab(tab.id)}
           >
-            <span className="text-[12px]">{tab.icon}</span>
-            {tab.label}
+            <span className="text-[14px]">{tab.icon}</span>
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -514,7 +542,7 @@ function AppInner() {
                 </div>
                 <div className="absolute inset-0 flex items-end justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                   style={{ background: "linear-gradient(transparent 40%, rgba(0,0,0,0.6))" }}>
-                  <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>Click to expand plate view</span>
+                  <span className="text-[12px] font-medium" style={{ color: COL.accent, textShadow: "0 0 6px rgba(0,234,255,0.5)" }}>{t("click_to_expand")}</span>
                 </div>
               </div>
 
@@ -554,15 +582,15 @@ function AppInner() {
         )}
       </div>
 
-      <footer className="h-7 flex items-center justify-center text-[10px]" style={{ color: COL.textDim, background: COL.bgDark, borderTop: `1px solid ${COL.border}` }}>
-        University of Bristol&nbsp;&nbsp;·&nbsp;&nbsp;AENG30017&nbsp;&nbsp;·&nbsp;&nbsp;Artur Akoev
+      <footer className="h-8 flex items-center justify-center text-[11px]" style={{ color: COL.textDim, background: COL.bgDark, borderTop: `1px solid ${COL.border}` }}>
+        {t("app_subtitle")}&nbsp;&nbsp;·&nbsp;&nbsp;AENG30017&nbsp;&nbsp;·&nbsp;&nbsp;{t("footer_student")}
       </footer>
 
       {/* Focus Modals */}
       <FocusModal
         open={focusTarget === "canvas"}
         onClose={() => setFocusTarget(null)}
-        title="Plate Preview"
+        title={t("plate_preview")}
       >
         <div className="w-full h-full flex items-center justify-center">
           <PlateCanvas {...canvasProps} />
@@ -572,7 +600,7 @@ function AppInner() {
       <FocusModal
         open={focusTarget === "results"}
         onClose={() => setFocusTarget(null)}
-        title="Results"
+        title={t("results")}
       >
         <ResultsPanel results={results} nDefects={nDefects} />
       </FocusModal>
@@ -580,7 +608,7 @@ function AppInner() {
       <FocusModal
         open={focusTarget === "laminate"}
         onClose={() => setFocusTarget(null)}
-        title="Laminate Analysis"
+        title={t("laminate")}
       >
         <LaminateBuilder
           laminateCode={laminateCode}
@@ -593,7 +621,7 @@ function AppInner() {
       <FocusModal
         open={showProjects}
         onClose={() => setShowProjects(false)}
-        title="Projects"
+        title={t("projects")}
       >
         <ProjectManager
           nDefects={nDefects} pressureX={pressureX} pressureY={pressureY}
