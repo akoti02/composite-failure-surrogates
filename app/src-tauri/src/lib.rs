@@ -39,7 +39,18 @@ fn spawn_sidecar() -> Result<SidecarProc, String> {
             .parent()
             .ok_or("Cannot find exe directory")?
             .to_path_buf();
-        Command::new(exe_dir.join(if cfg!(target_os = "windows") { "rp3-sidecar.exe" } else { "rp3-sidecar" }))
+        let sidecar_name = if cfg!(target_os = "windows") { "rp3-sidecar.exe" } else { "rp3-sidecar" };
+        // Check multiple locations: next to exe, then Tauri resource dirs
+        let candidates = [
+            exe_dir.join(sidecar_name),
+            exe_dir.join("_up_").join("sidecar").join("dist").join(sidecar_name),
+            exe_dir.join("_up_").join(sidecar_name),
+        ];
+        let sidecar_path = candidates.iter()
+            .find(|p| p.exists())
+            .ok_or_else(|| format!("Sidecar not found in: {:?}", candidates))?
+            .clone();
+        Command::new(sidecar_path)
     };
 
     // Redirect stderr to a log file instead of discarding it entirely.

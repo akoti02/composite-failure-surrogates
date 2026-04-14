@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { Header } from "./components/Header";
 
 // Error boundary to prevent white screen of death
@@ -138,7 +137,7 @@ function formatResultsForExport(
 const initDefects = (): DefectParams[] =>
   Array.from({ length: MAX_DEFECTS }, (_, i) => ({ ...(DEFAULT_DEFECTS[i] || DEFAULT_DEFECT) }));
 
-type FocusTarget = null | "canvas" | "results";
+type FocusTarget = null | "canvas" | "results" | "laminate";
 type AppTab = "analysis" | "explorer";
 
 const TABS: { id: AppTab; label: string; icon: string }[] = [
@@ -147,7 +146,7 @@ const TABS: { id: AppTab; label: string; icon: string }[] = [
 ];
 
 const GITHUB_REPO = "akoti02/composite-failure-surrogates";
-const CURRENT_VERSION = "0.1.0";
+const CURRENT_VERSION = "0.2.0";
 
 interface ReleaseInfo {
   tag: string;
@@ -200,7 +199,7 @@ function UpdateBanner() {
       <button
         className="px-3 py-0.5 rounded-md text-[11px] font-semibold cursor-pointer"
         style={{ background: "#7c3aed", color: "#fff", border: "none" }}
-        onClick={() => openUrl(release.downloadUrl)}
+        onClick={() => import("@tauri-apps/plugin-opener").then(m => m.openUrl(release.downloadUrl)).catch(() => window.open(release.downloadUrl, "_blank"))}
       >
         Download update
       </button>
@@ -345,7 +344,8 @@ function AppInner() {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes("__TAURI__")) setStatus(`Error: ${msg.slice(0, 60)}`);
+      console.error("Prediction failed:", msg);
+      setStatus(`Error: ${msg.slice(0, 80)}`);
     }
     predictingRef.current = false;
     setPredicting(false);
@@ -440,6 +440,7 @@ function AppInner() {
         onPreset={handlePreset} onExport={handleExport} hasResults={results !== null}
         onPredict={handlePredict} onReset={handleReset}
         onProjects={() => setShowProjects(true)}
+        onLaminate={() => setFocusTarget("laminate")}
       />
 
       {/* Tab bar — arrow keys navigate between tabs */}
@@ -479,25 +480,24 @@ function AppInner() {
       <div className="flex-1 min-h-0">
         {/* Analysis tab — inputs + predictions + laminate info */}
         {activeTab === "analysis" && (
-          <div className="h-full grid grid-cols-1 lg:grid-cols-[45fr_55fr] min-h-0">
-            <div className="flex flex-col min-h-0 overflow-y-auto" style={{ borderRight: `1px solid ${COL.border}` }}>
+          <div className="h-full grid grid-cols-1 lg:grid-cols-[42fr_58fr] min-h-0">
+            <div className="flex flex-col min-h-0" style={{ borderRight: `1px solid ${COL.border}` }}>
+              {/* Compact plate preview — click to expand */}
               <div
-                className="shrink-0 px-3 pt-2 pb-1 relative group"
-                style={{ background: COL.bg, borderBottom: `1px solid ${COL.border}` }}
+                className="shrink-0 relative group cursor-pointer"
+                style={{ height: 140, background: COL.bgDark, borderBottom: `1px solid ${COL.border}`, overflow: "hidden" }}
+                onClick={() => setFocusTarget("canvas")}
               >
-                <PlateCanvas {...canvasProps} />
-                <button
-                  className="absolute top-3 right-4 w-6 h-6 flex items-center justify-center rounded-md btn-press opacity-40 hover:opacity-100 transition-opacity"
-                  style={{ color: COL.textDim, background: "rgba(0,0,0,0.5)", border: `1px solid ${COL.border}` }}
-                  onClick={() => setFocusTarget("canvas")}
-                  data-tooltip="Expand canvas"
-                  aria-label="Expand plate canvas"
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                  </svg>
-                </button>
+                <div style={{ transform: "scale(0.55)", transformOrigin: "top center", pointerEvents: "none" }}>
+                  <PlateCanvas {...canvasProps} />
+                </div>
+                <div className="absolute inset-0 flex items-end justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  style={{ background: "linear-gradient(transparent 40%, rgba(0,0,0,0.6))" }}>
+                  <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>Click to expand plate view</span>
+                </div>
               </div>
+
+              {/* INPUT PANEL — primary content, gets all remaining space */}
               <InputPanel
                 nDefects={nDefects} setNDefects={setNDefects}
                 pressureX={pressureX} setPressureX={setPressureX}
@@ -507,15 +507,6 @@ function AppInner() {
                 bcMode={bcMode} setBcMode={setBcMode}
                 defects={defects} updateDefect={updateDefect}
               />
-              {/* Laminate section — integrated into Analysis view */}
-              <div style={{ borderTop: `1px solid ${COL.border}` }}>
-                <LaminateBuilder
-                  laminateCode={laminateCode}
-                  onLaminateCodeChange={setLaminateCode}
-                  materialId={laminateMaterialId}
-                  onMaterialIdChange={setLaminateMaterialId}
-                />
-              </div>
             </div>
             <ResultsPanel
               results={results}
@@ -563,6 +554,19 @@ function AppInner() {
         title="Results"
       >
         <ResultsPanel results={results} nDefects={nDefects} />
+      </FocusModal>
+
+      <FocusModal
+        open={focusTarget === "laminate"}
+        onClose={() => setFocusTarget(null)}
+        title="Laminate Analysis"
+      >
+        <LaminateBuilder
+          laminateCode={laminateCode}
+          onLaminateCodeChange={setLaminateCode}
+          materialId={laminateMaterialId}
+          onMaterialIdChange={setLaminateMaterialId}
+        />
       </FocusModal>
 
       <FocusModal

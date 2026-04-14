@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "RP3",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "uk.ac.bristol.rp3",
   "build": {
     "frontendDist": "../dist",
