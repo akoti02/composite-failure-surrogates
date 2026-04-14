@@ -356,7 +356,7 @@ function UpdateBanner() {
 // Visible app version — shown in footer so users can confirm an update
 // landed. Update this together with Cargo.toml + tauri.conf.json on each
 // version bump (handled by the release workflow's tag).
-const APP_VERSION = "0.3.5";
+const APP_VERSION = "0.3.6";
 
 function AppInner() {
   const t = useT();
@@ -596,6 +596,7 @@ function AppInner() {
 
   const canvasProps = {
     nDefects, defects, pressureX, pressureY,
+    materialKey,
   };
 
   return (
@@ -654,14 +655,22 @@ function AppInner() {
               {/* Compact plate preview — click to expand */}
               <div
                 className="shrink-0 relative group cursor-pointer"
-                style={{ height: 140, background: COL.bgDark, borderBottom: `1px solid ${COL.border}`, overflow: "hidden" }}
+                style={{ height: 180, background: COL.bgDark, borderBottom: `1px solid ${COL.border}`, overflow: "hidden" }}
                 onClick={() => setFocusTarget("canvas")}
               >
-                <div style={{ transform: "scale(0.55)", transformOrigin: "top center", pointerEvents: "none" }}>
-                  <PlateCanvas {...canvasProps} />
+                {/* Compact preview — lower stress-field resolution + no legend/contours,
+                    so it stays crisp when ~180 px tall but still shows the actual
+                    Lekhnitskii stress heatmap. Click to open the full detailed modal. */}
+                <div style={{ pointerEvents: "none", padding: 8, height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <PlateCanvas
+                    {...canvasProps}
+                    resolution={40}
+                    showContours={false}
+                    showLegend={false}
+                  />
                 </div>
                 <div className="absolute inset-0 flex items-end justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                  style={{ background: "linear-gradient(transparent 40%, rgba(0,0,0,0.6))" }}>
+                  style={{ background: "linear-gradient(transparent 60%, rgba(0,0,0,0.7))" }}>
                   <span className="text-[12px] font-medium" style={{ color: COL.accent, textShadow: "0 0 6px rgba(0,234,255,0.5)" }}>{t("click_to_expand")}</span>
                 </div>
               </div>
