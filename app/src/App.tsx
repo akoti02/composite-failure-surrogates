@@ -356,7 +356,7 @@ function UpdateBanner() {
 // Visible app version — shown in footer so users can confirm an update
 // landed. Update this together with Cargo.toml + tauri.conf.json on each
 // version bump (handled by the release workflow's tag).
-const APP_VERSION = "0.3.2";
+const APP_VERSION = "0.3.3";
 
 function AppInner() {
   const t = useT();
@@ -527,11 +527,6 @@ function AppInner() {
     return () => clearTimeout(timer);
   }, [modelsReady, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, runPrediction]);
 
-  // Manual predict (Run button / Enter key) — also saves to history
-  const handlePredict = useCallback(() => {
-    runPrediction(true);
-  }, [runPrediction]);
-
   const handleReset = useCallback(() => {
     setActivePreset("");
     setNDefects(3);
@@ -582,19 +577,6 @@ function AppInner() {
     );
   }, []);
 
-  // Enter key triggers predict — only when not focused on an input
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && modelsReady) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
-        handlePredict();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handlePredict, modelsReady]);
-
   // Wrap input setters to clear preset label on manual changes
   const setNDefectsManual = useCallback((v: number) => { setActivePreset(""); setNDefects(v); }, []);
   const setPressureXManual = useCallback((v: number) => { setActivePreset(""); setPressureX(v); }, []);
@@ -623,7 +605,7 @@ function AppInner() {
         status={status} modelsReady={modelsReady} predicting={predicting}
         activePreset={activePreset}
         onPreset={handlePreset} onExport={handleExport} hasResults={results !== null}
-        onPredict={handlePredict} onReset={handleReset}
+        onReset={handleReset}
         onProjects={() => setShowProjects(true)}
         onLaminate={() => setFocusTarget("laminate")}
       />

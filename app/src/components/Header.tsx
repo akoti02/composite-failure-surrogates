@@ -11,7 +11,6 @@ interface Props {
   onPreset: (name: string) => void;
   onExport: () => void;
   hasResults: boolean;
-  onPredict: () => void;
   onReset: () => void;
   onProjects: () => void;
   onLaminate: () => void;
@@ -47,7 +46,7 @@ function LangToggle() {
   );
 }
 
-export function Header({ status, modelsReady, predicting, activePreset, onPreset, onExport, hasResults, onPredict, onReset, onProjects, onLaminate }: Props) {
+export function Header({ status, modelsReady, predicting, activePreset, onPreset, onExport, hasResults, onReset, onProjects, onLaminate }: Props) {
   const { t } = useLang();
   const dotColor = predicting ? COL.accent : modelsReady ? COL.success : COL.textDim;
   const dotClass = predicting ? "dot-pulse-fast" : modelsReady ? "" : "dot-pulse";
@@ -55,7 +54,7 @@ export function Header({ status, modelsReady, predicting, activePreset, onPreset
 
   return (
     <header
-      className="h-14 flex items-center px-5 gap-4 shrink-0"
+      className="tooltip-below h-14 flex items-center px-5 gap-4 shrink-0"
       style={{
         background: COL.bgDark,
         borderBottom: `1px solid ${COL.border}`,
@@ -179,24 +178,9 @@ export function Header({ status, modelsReady, predicting, activePreset, onPreset
           </svg>
         </button>
 
-        {/* Run Prediction button */}
-        <button
-          className={`px-4 py-1.5 rounded-lg text-[13px] font-semibold ${predicting ? "btn-shimmer" : "btn-press"}`}
-          style={{
-            background: modelsReady && !predicting ? COL.accent : "rgba(255,255,255,0.07)",
-            color: modelsReady && !predicting ? "#041017" : COL.textDim,
-            cursor: modelsReady && !predicting ? "pointer" : "not-allowed",
-            border: `1px solid ${modelsReady && !predicting ? "rgba(0,234,255,0.5)" : COL.border}`,
-            boxShadow: modelsReady && !predicting ? "0 0 20px rgba(0,234,255,0.35), 0 0 2px rgba(0,234,255,0.6)" : "none",
-            textShadow: modelsReady && !predicting ? "0 0 0" : undefined,
-          }}
-          onClick={onPredict}
-          disabled={!modelsReady || predicting}
-        >
-          {predicting ? "•••" : <>{t("run")} <span className="text-[10px] opacity-60 ml-1">{t("key_enter")}</span></>}
-        </button>
-
-        {/* Language toggle — always visible, switches live */}
+        {/* Language toggle — always visible, switches live. No Run button:
+           predictions update live as inputs change (200ms debounce), and
+           snapshot-saving lives in the Projects modal. */}
         <LangToggle />
       </div>
 
