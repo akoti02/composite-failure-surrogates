@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { COL } from "../lib/constants";
 import { MATERIAL_DB, DEFAULT_MATERIAL_ID, type MaterialProperties } from "../lib/materials";
 import {
@@ -6,6 +6,55 @@ import {
   LAMINATE_PRESETS, type PlyDef, type ABDResult, type PlyResult,
 } from "../lib/clt";
 import { useT } from "../lib/i18n";
+import type { TKey } from "../lib/i18n";
+
+/**
+ * Map the raw English failure-mode string produced by clt.ts's
+ * `failureMode()` function to an i18n key. Keeping the raw strings in
+ * clt.ts as stable data (they're not user-facing at that layer) and
+ * translating at display time means the analysis module doesn't need to
+ * depend on the i18n context.
+ */
+const FAILURE_MODE_KEYS: Record<string, TKey> = {
+  "Tsai-Wu":     "fm_tsai_wu",
+  "Max Stress":  "fm_max_stress",
+  "Hashin FT":   "fm_hashin_ft",
+  "Hashin FC":   "fm_hashin_fc",
+  "Hashin MT":   "fm_hashin_mt",
+  "Hashin MC":   "fm_hashin_mc",
+};
+
+/**
+ * Inline numeric input with a local string buffer — same pattern as
+ * NumberInput, stripped down for use in the 6-cell load grid. Empty/
+ * intermediate typing states don't collapse to 0.
+ */
+function LoadInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    const p = parseFloat(text);
+    if (isNaN(p) || Math.abs(p - value) > 1e-9) setText(String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <div className="flex flex-col gap-0.5">
+      <label className="text-[11px]" style={{ color: COL.textDim }}>{label}</label>
+      <input
+        type="text"
+        inputMode="decimal"
+        className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
+        style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          const p = parseFloat(e.target.value);
+          if (isFinite(p)) onChange(p);
+        }}
+        onBlur={() => setText(String(value))}
+      />
+    </div>
+  );
+}
 
 /** Polar plot of stiffness for laminate visualization */
 function StiffnessPolar({ abd }: { abd: ABDResult }) {
@@ -324,6 +373,68 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
     { id: "failure" as const,   label: t("tab_failure") },
   ];
 
+  // Translate a failure-mode string (e.g. "Hashin MT") from clt.ts into
+  // the active language. Falls back to the raw string if we've not got a
+  // mapping for it yet (easier to ship a new clt mode than to ship a
+  // missing translation crash).
+  const tMode = (mode: string): string => {
+    const key = FAILURE_MODE_KEYS[mode];
+    return key ? t(key) : mode;
+  };
+
+  // Which preset (if any) exactly matches the current code? Used to show
+  // the dropdown's selected value so the user can tell which preset is
+  // loaded.
+  const selectedPreset = Object.entries(LAMINATE_PRESETS)
+    .find(([, code]) => code === laminateCode)?.[0] ?? "";
+
+  const handleExport = useCallback(() => {
+    if (!analysis) return;
+    const lines: string[] = [t("export_laminate_title"), "=" .repeat(40), ""];
+    lines.push(`${t("export_layup")}: ${laminateCode}`);
+    lines.push(`${t("material")}: ${materialId}`);
+    lines.push(`${t("plies")}: ${analysis.plies.length} · ${analysis.result.abd.totalThickness.toFixed(3)} ${t("unit_mm")}`);
+    lines.push("");
+    lines.push(`${t("export_loads")}:`);
+    lines.push(`  Nx=${Nx}  Ny=${Ny}  Nxy=${Nxy} ${t("unit_n_per_mm")}`);
+    lines.push(`  Mx=${Mx}  My=${My}  Mxy=${Mxy} ${t("unit_n_mm_per_mm")}`);
+    lines.push("");
+    lines.push(`${t("export_engineering")}:`);
+    lines.push(`  Ex  = ${analysis.result.abd.Ex.toFixed(2)} ${t("unit_gpa")}`);
+    lines.push(`  Ey  = ${analysis.result.abd.Ey.toFixed(2)} ${t("unit_gpa")}`);
+    lines.push(`  Gxy = ${analysis.result.abd.Gxy.toFixed(2)} ${t("unit_gpa")}`);
+    lines.push(`  νxy = ${analysis.result.abd.vxy.toFixed(3)}`);
+    lines.push("");
+    lines.push(`${t("export_stiffness")} [A] (${t("unit_n_per_mm")}):`);
+    for (const row of analysis.result.abd.A) lines.push("  " + row.map(v => v.toExponential(3)).join("  "));
+    lines.push(`${t("export_stiffness")} [B] (N):`);
+    for (const row of analysis.result.abd.B) lines.push("  " + row.map(v => v.toExponential(3)).join("  "));
+    lines.push(`${t("export_stiffness")} [D] (${t("unit_n_mm_per_mm")}·mm):`);
+    for (const row of analysis.result.abd.D) lines.push("  " + row.map(v => v.toExponential(3)).join("  "));
+    lines.push("");
+    lines.push(`${t("export_ply_stresses")}:`);
+    lines.push("  #   θ      σ₁      σ₂     τ₁₂   Tsai-Wu  MaxStress  Status");
+    analysis.result.plies.forEach((p, i) => {
+      lines.push(
+        `  ${String(i + 1).padStart(2)}  ${String(p.angle).padStart(4)}° ` +
+        `${p.sigma1.toFixed(1).padStart(8)}  ${p.sigma2.toFixed(1).padStart(7)}  ` +
+        `${p.tau12.toFixed(1).padStart(6)}  ${p.tsaiWu.toFixed(3).padStart(7)}  ` +
+        `${p.maxStress.toFixed(3).padStart(8)}   ${p.failed ? tMode(p.failureMode) : t("ok_status")}`
+      );
+    });
+    lines.push("");
+    lines.push(`${t("export_failure")}:`);
+    if (analysis.result.firstPlyFailure) {
+      lines.push(`  ${t("first_ply_failure")}: ${analysis.result.firstPlyFailure.load.toFixed(3)}× — ${t("ply")} ${analysis.result.firstPlyFailure.plyIndex + 1} · ${tMode(analysis.result.firstPlyFailure.mode)}`);
+    } else {
+      lines.push(`  ${t("first_ply_failure")}: ${t("no_failure")}`);
+    }
+    if (analysis.result.lastPlyFailure) {
+      lines.push(`  ${t("last_ply_failure")}: ${analysis.result.lastPlyFailure.load.toFixed(3)}×`);
+    }
+    navigator.clipboard.writeText(lines.join("\n")).catch(() => { /* ignore */ });
+  }, [analysis, laminateCode, materialId, Nx, Ny, Nxy, Mx, My, Mxy, t]);
+
   return (
     <div className="flex flex-col h-full gap-3">
       {/* Top controls */}
@@ -359,62 +470,55 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
           <label className="text-[12px]" style={{ color: COL.textMid }}>{t("preset")}</label>
           <select
             className="text-[13px] px-2.5 py-2 rounded-md outline-none"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
-            value=""
-            onChange={(e) => { if (e.target.value) setLaminateCode(LAMINATE_PRESETS[e.target.value]); e.target.value = ""; }}
+            style={{
+              background: COL.panel,
+              border: `1px solid ${selectedPreset ? COL.borderBright : COL.border}`,
+              color: COL.text,
+              boxShadow: selectedPreset ? COL.accentGlowSoft : "none",
+            }}
+            value={selectedPreset}
+            onChange={(e) => { if (e.target.value) setLaminateCode(LAMINATE_PRESETS[e.target.value]); }}
           >
-            <option value="" disabled>{t("select_preset")}</option>
+            <option value="">{t("select_preset")}</option>
             {Object.entries(LAMINATE_PRESETS).map(([name, code]) => (
               <option key={name} value={name}>{name} → {code}</option>
             ))}
           </select>
         </div>
 
-        {analysis && (
-          <div className="text-[12px] ml-auto" style={{ color: COL.textMid }}>
-            {analysis.plies.length} {t("plies")} · {analysis.result.abd.totalThickness.toFixed(2)} {t("unit_mm")}
-          </div>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {analysis && (
+            <div className="text-[12px]" style={{ color: COL.textMid }}>
+              {analysis.plies.length} {t("plies")} · {analysis.result.abd.totalThickness.toFixed(2)} {t("unit_mm")}
+            </div>
+          )}
+          {analysis && (
+            <button
+              className="text-[12px] px-3 py-1.5 rounded-md btn-press flex items-center gap-1.5"
+              style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.textMid }}
+              onClick={handleExport}
+              aria-label={t("export_laminate")}
+              data-tooltip={t("export_tooltip")}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+              {t("export_laminate")}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Loads */}
+      {/* Loads — use the shared text-backed LoadInput so deletions leave
+         the field truly empty instead of immediately snapping to 0. */}
       <div className="grid grid-cols-6 gap-2">
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[11px]" style={{ color: COL.textDim }}>Nx ({t("unit_n_per_mm")})</label>
-          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
-            type="number" value={Nx} onChange={(e) => setNx(Number(e.target.value))} />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[11px]" style={{ color: COL.textDim }}>Ny ({t("unit_n_per_mm")})</label>
-          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
-            type="number" value={Ny} onChange={(e) => setNy(Number(e.target.value))} />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[11px]" style={{ color: COL.textDim }}>Nxy ({t("unit_n_per_mm")})</label>
-          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
-            type="number" value={Nxy} onChange={(e) => setNxy(Number(e.target.value))} />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[11px]" style={{ color: COL.textDim }}>Mx ({t("unit_n_mm_per_mm")})</label>
-          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
-            type="number" value={Mx} onChange={(e) => setMx(Number(e.target.value))} />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[11px]" style={{ color: COL.textDim }}>My ({t("unit_n_mm_per_mm")})</label>
-          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
-            type="number" value={My} onChange={(e) => setMy(Number(e.target.value))} />
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <label className="text-[11px]" style={{ color: COL.textDim }}>Mxy ({t("unit_n_mm_per_mm")})</label>
-          <input className="text-[13px] px-2.5 py-1.5 rounded-md outline-none tabular-nums"
-            style={{ background: COL.panel, border: `1px solid ${COL.border}`, color: COL.text }}
-            type="number" value={Mxy} onChange={(e) => setMxy(Number(e.target.value))} />
-        </div>
+        <LoadInput label={`Nx (${t("unit_n_per_mm")})`} value={Nx} onChange={setNx} />
+        <LoadInput label={`Ny (${t("unit_n_per_mm")})`} value={Ny} onChange={setNy} />
+        <LoadInput label={`Nxy (${t("unit_n_per_mm")})`} value={Nxy} onChange={setNxy} />
+        <LoadInput label={`Mx (${t("unit_n_mm_per_mm")})`} value={Mx} onChange={setMx} />
+        <LoadInput label={`My (${t("unit_n_mm_per_mm")})`} value={My} onChange={setMy} />
+        <LoadInput label={`Mxy (${t("unit_n_mm_per_mm")})`} value={Mxy} onChange={setMxy} />
       </div>
 
       {/* Analysis tabs */}
@@ -502,7 +606,7 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
                           </td>
                           <td className="text-center px-2">
                             {p.failed ? (
-                              <span style={{ color: COL.danger, fontSize: 11 }}>{p.failureMode}</span>
+                              <span style={{ color: COL.danger, fontSize: 11 }}>{tMode(p.failureMode)}</span>
                             ) : (
                               <span style={{ color: COL.success }}>{t("ok_status")}</span>
                             )}
@@ -543,7 +647,7 @@ export function LaminateBuilder(props: LaminateBuilderProps) {
                   </div>
                   {analysis.result.firstPlyFailure && (
                     <div className="text-[11px] mt-0.5" style={{ color: COL.textDim }}>
-                      {t("ply")} {analysis.result.firstPlyFailure.plyIndex + 1} · {analysis.result.firstPlyFailure.mode}
+                      {t("ply")} {analysis.result.firstPlyFailure.plyIndex + 1} · {tMode(analysis.result.firstPlyFailure.mode)}
                     </div>
                   )}
                 </div>

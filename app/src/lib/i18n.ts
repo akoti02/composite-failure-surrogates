@@ -56,6 +56,22 @@ const DICT = {
   status_copy_failed:     { en: "Clipboard write failed",      ru: "Не удалось записать в буфер обмена" },
   status_analysis_complete:{ en: "Analysis complete",          ru: "Анализ завершён" },
 
+  // ── Laminate failure modes + export ──
+  fm_tsai_wu:             { en: "Tsai-Wu",                    ru: "Цай-Ву" },
+  fm_max_stress:          { en: "Max Stress",                 ru: "Макс. напряжение" },
+  fm_hashin_ft:           { en: "Hashin FT",                  ru: "Хашин FT" },
+  fm_hashin_fc:           { en: "Hashin FC",                  ru: "Хашин FC" },
+  fm_hashin_mt:           { en: "Hashin MT",                  ru: "Хашин MT" },
+  fm_hashin_mc:           { en: "Hashin MC",                  ru: "Хашин MC" },
+  export_laminate:        { en: "Export laminate",            ru: "Экспорт ламината" },
+  export_laminate_title:  { en: "Laminate Analysis Results",  ru: "Результаты анализа ламината" },
+  export_layup:           { en: "Layup",                      ru: "Укладка" },
+  export_loads:           { en: "Applied loads",              ru: "Приложенные нагрузки" },
+  export_stiffness:       { en: "Laminate stiffness",         ru: "Жёсткость ламината" },
+  export_engineering:     { en: "Engineering constants",      ru: "Инженерные константы" },
+  export_ply_stresses:    { en: "Ply stresses (material axes)", ru: "Напряжения в слоях (материальные оси)" },
+  export_failure:         { en: "Failure summary",            ru: "Сводка по разрушению" },
+
   // ── Update banner / updater flow ──
   update_available:       { en: "Version {v} is available",    ru: "Доступна версия {v}" },
   update_download:        { en: "Update now",                  ru: "Обновить сейчас" },

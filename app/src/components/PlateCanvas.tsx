@@ -118,24 +118,37 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
     labelPositions.push(bestPos);
 
     defectShapes.push(
-      <g key={`d${i}`} filter={`url(#defectGlow${i})`}>
+      <g key={`d${i}`}>
+        {/* Blurred halo — a duplicate of the ellipse, rendered below the
+           crisp one. Isolating the glow to its own element means the
+           label and shape stroke stay razor-sharp, unlike before when
+           the filter was on the whole group and softened everything. */}
         <ellipse
           cx={dcx} cy={dcy}
           rx={halfL} ry={halfW}
           transform={`rotate(${d.angle} ${dcx} ${dcy})`}
-          fill={DEFECT_COLORS[i]} fillOpacity={0.12}
-          stroke={DEFECT_COLORS[i]} strokeWidth={1.5} strokeOpacity={0.9}
+          fill={DEFECT_COLORS[i]} fillOpacity={0.35}
+          stroke="none"
+          filter={`url(#defectGlow${i})`}
+        />
+        {/* Crisp shape */}
+        <ellipse
+          cx={dcx} cy={dcy}
+          rx={halfL} ry={halfW}
+          transform={`rotate(${d.angle} ${dcx} ${dcy})`}
+          fill={DEFECT_COLORS[i]} fillOpacity={0.15}
+          stroke={DEFECT_COLORS[i]} strokeWidth={1.5} strokeOpacity={1}
         />
         <line
           x1={cx(d.x - d.half_length * Math.cos(rad))}
           y1={cy(d.y - d.half_length * Math.sin(rad))}
           x2={cx(d.x + d.half_length * Math.cos(rad))}
           y2={cy(d.y + d.half_length * Math.sin(rad))}
-          stroke={DEFECT_COLORS[i]} strokeWidth={1} strokeLinecap="round" strokeDasharray="3 2" strokeOpacity={0.6}
+          stroke={DEFECT_COLORS[i]} strokeWidth={1} strokeLinecap="round" strokeDasharray="3 2" strokeOpacity={0.7}
         />
-        {/* Label with background for readability */}
-        <circle cx={bestPos.x} cy={bestPos.y - 1} r={6}
-          fill={COL.canvasBg} fillOpacity={0.85} stroke={DEFECT_COLORS[i]} strokeWidth={1} />
+        {/* Label with background for readability — outside the filter */}
+        <circle cx={bestPos.x} cy={bestPos.y - 1} r={7}
+          fill={COL.canvasBg} fillOpacity={0.92} stroke={DEFECT_COLORS[i]} strokeWidth={1.2} />
         <text x={bestPos.x} y={bestPos.y + 3} fill={DEFECT_COLORS[i]} fontSize={11} fontWeight="700" textAnchor="middle">
           {i + 1}
         </text>
@@ -161,15 +174,17 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) 
         <pattern id="fiberPattern" width="6" height="6" patternUnits="userSpaceOnUse">
           <line x1="3" y1="0" x2="3" y2="6" stroke="rgba(99,102,241,0.06)" strokeWidth="0.8" />
         </pattern>
-        {/* Glow filters for each defect color */}
+        {/* Glow filters for each defect colour. Now applied only to the
+           blurred halo ellipse (not the label), and with a tighter
+           stdDeviation (2 instead of 4) so the glow reads as a subtle
+           luminescence rather than a dust cloud. */}
         {DEFECT_COLORS.map((color, i) => (
           <filter key={`glow${i}`} id={`defectGlow${i}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-            <feFlood floodColor={color} floodOpacity="0.3" result="color" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur" />
+            <feFlood floodColor={color} floodOpacity="0.6" result="color" />
             <feComposite in="color" in2="blur" operator="in" result="glow" />
             <feMerge>
               <feMergeNode in="glow" />
-              <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         ))}

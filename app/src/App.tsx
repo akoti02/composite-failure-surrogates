@@ -356,7 +356,7 @@ function UpdateBanner() {
 // Visible app version — shown in footer so users can confirm an update
 // landed. Update this together with Cargo.toml + tauri.conf.json on each
 // version bump (handled by the release workflow's tag).
-const APP_VERSION = "0.3.3";
+const APP_VERSION = "0.3.4";
 
 function AppInner() {
   const t = useT();
