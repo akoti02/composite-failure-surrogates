@@ -40,13 +40,24 @@ fn spawn_sidecar() -> Result<SidecarProc, String> {
             .ok_or("Cannot find exe directory")?
             .to_path_buf();
         let sidecar_name = if cfg!(target_os = "windows") { "rp3-sidecar.exe" } else { "rp3-sidecar" };
-        // Check multiple locations: next to exe, then Tauri resource dirs
-        let candidates = [
+        // Check multiple locations. Tauri bundles resources differently
+        // per platform:
+        //   Windows  — next to the main exe (and under _up_/ for NSIS)
+        //   macOS    — in RP3.app/Contents/Resources/ (exe is in Contents/MacOS/,
+        //              so we step up one level to parent and look in Resources/)
+        //   Linux    — alongside the exe
+        let mac_resources = exe_dir.parent().map(|p| p.join("Resources"));
+        let candidates: Vec<std::path::PathBuf> = vec![
             exe_dir.join(sidecar_name),
             exe_dir.join("_up_").join("sidecar").join("dist").join(sidecar_name),
             exe_dir.join("_up_").join(sidecar_name),
+            // macOS app-bundle resource layout
+            mac_resources.clone().map(|p| p.join("_up_").join("sidecar").join("dist").join(sidecar_name)).unwrap_or_default(),
+            mac_resources.clone().map(|p| p.join("_up_").join(sidecar_name)).unwrap_or_default(),
+            mac_resources.map(|p| p.join(sidecar_name)).unwrap_or_default(),
         ];
         let sidecar_path = candidates.iter()
+            .filter(|p| !p.as_os_str().is_empty())
             .find(|p| p.exists())
             .ok_or_else(|| format!("Sidecar not found in: {:?}", candidates))?
             .clone();

@@ -1,6 +1,6 @@
 [package]
 name = "rp3"
-version = "0.3.4"
+version = "0.3.5"
 description = "RP3 Composite Failure Surrogate"
 authors = ["Artur Akoev"]
 edition = "2021"

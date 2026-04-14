@@ -1,0 +1,13 @@
+# Sidecar Python dependencies.
+#
+# Pinned to what we've been building locally on Windows so CI matches.
+# xgboost ships a C++ runtime library per-platform (xgboost.dll on
+# Windows, libxgboost.dylib on Mac, libxgboost.so on Linux); all of
+# these are handled by the spec file.
+numpy==2.3.5
+scipy==1.17.1
+scikit-learn==1.8.0
+xgboost==3.2.0
+joblib>=1.4.0
+threadpoolctl>=3.5.0
+pyinstaller==6.19.0

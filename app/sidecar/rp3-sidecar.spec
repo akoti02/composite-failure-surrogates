@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-import os, sys, sysconfig
+import os, sys, sysconfig, platform
 from PyInstaller.utils.hooks import collect_submodules
 
 # Only collect sklearn.preprocessing and its minimal dependencies
@@ -11,13 +11,22 @@ sklearn_imports = (
 # Remove test modules
 sklearn_imports = [m for m in sklearn_imports if '.tests' not in m and '.test_' not in m]
 
-# Dynamically locate xgboost files instead of hardcoding user paths
+# xgboost ships a platform-specific C++ runtime alongside the Python
+# package. PyInstaller's auto-hook usually finds it, but on some
+# distributions (notably macOS universal builds) it misses the dylib,
+# so we bundle it explicitly when we can see it.
 import xgboost as _xgb
 _xgb_dir = os.path.dirname(_xgb.__file__)
-_xgb_dll = os.path.join(_xgb_dir, 'lib', 'xgboost.dll')
+_sys = platform.system()
+if _sys == 'Windows':
+    _xgb_lib = os.path.join(_xgb_dir, 'lib', 'xgboost.dll')
+elif _sys == 'Darwin':
+    _xgb_lib = os.path.join(_xgb_dir, 'lib', 'libxgboost.dylib')
+else:  # Linux
+    _xgb_lib = os.path.join(_xgb_dir, 'lib', 'libxgboost.so')
 _xgb_ver = os.path.join(_xgb_dir, 'VERSION')
 
-_binaries = [(_xgb_dll, 'xgboost/lib')] if os.path.exists(_xgb_dll) else []
+_binaries = [(_xgb_lib, 'xgboost/lib')] if os.path.exists(_xgb_lib) else []
 _datas = [('_models_data.py', '.')]
 if os.path.exists(_xgb_ver):
     _datas.insert(0, (_xgb_ver, 'xgboost'))

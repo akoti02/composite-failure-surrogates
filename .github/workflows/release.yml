@@ -1,10 +1,9 @@
 name: Release
 
-# Triggered by pushing a tag that starts with "v" (e.g. v0.3.0, v0.4.0).
-# Builds a signed Windows release, uploads the installer + signature +
-# auto-generated latest.json to a GitHub Release. Installed copies of the
-# app will then see the new version on next launch and offer an in-app
-# update with no reinstall.
+# Triggered by pushing a tag that starts with "v" (e.g. v0.3.5).
+# Builds signed Windows + macOS (Apple Silicon) bundles on matching GitHub
+# Actions runners, publishes both to a single GitHub Release, and
+# updates latest.json so installed copies auto-offer the update.
 #
 # Required repo secrets:
 #   TAURI_SIGNING_PRIVATE_KEY           — contents of ~/.tauri/rp3.key
@@ -20,17 +19,31 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: app
+  build:
+    strategy:
+      # Let the Windows build finish even if the Mac build fails; we'd
+      # rather have "Windows works, Mac broken" than "neither".
+      fail-fast: false
+      matrix:
+        include:
+          # macOS: Apple Silicon (aarch64). GH macos-latest runner is
+          # arm64 by default as of macos-14+, so this compiles natively.
+          - platform: macos-latest
+            rust-target: aarch64-apple-darwin
+            tauri-args: --target aarch64-apple-darwin
+          - platform: windows-latest
+            rust-target: ''
+            tauri-args: ''
+
+    runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      # Node 20 LTS — newer versions (21+) aren't always supported by
+      # Tauri 2's CLI or some Vite plugins we use.
+      - name: Setup Node.js 20 LTS
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -39,6 +52,8 @@ jobs:
 
       - name: Setup Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -49,20 +64,24 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: app/sidecar/requirements.txt
 
       - name: Install frontend dependencies
+        working-directory: app
         run: npm ci
 
-      - name: Install sidecar Python deps and build sidecar
-        shell: bash
-        working-directory: sidecar
+      - name: Install sidecar Python deps
+        working-directory: app/sidecar
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyinstaller
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f build.sh ]; then bash build.sh; elif [ -f build.py ]; then python build.py; else pyinstaller --onefile --name rp3-sidecar server.py; fi
+          pip install -r requirements.txt
 
-      - name: Build Tauri (signed) and publish release
+      - name: Build sidecar with PyInstaller
+        working-directory: app/sidecar
+        run: pyinstaller --clean rp3-sidecar.spec
+
+      - name: Build Tauri bundle + publish release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -75,9 +94,13 @@ jobs:
           releaseBody: |
             ## RP3 ${{ github.ref_name }}
 
-            Installed copies will auto-update on next launch. See README for notes.
+            Installed copies auto-update on launch.
+
+            **Windows (x64)** — download `RP3_*_x64-setup.exe` and run.
+            **macOS (Apple Silicon)** — download `RP3_*_aarch64.dmg`, open, drag to Applications. First launch: Ctrl-click the app in the Applications folder → **Open** (the build isn't Apple-notarized, so Gatekeeper warns the first time; every launch after is normal).
+
+            Auto-update applies to both platforms from this release forward.
           releaseDraft: false
           prerelease: false
-          # Generate latest.json so existing installs know about this release.
-          # Requires tauri.conf.json `bundle.createUpdaterArtifacts = true`.
           updaterJsonPreferNsis: true
+          args: ${{ matrix.tauri-args }}
