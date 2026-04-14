@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Header } from "./components/Header";
 
 // Error boundary to prevent white screen of death
@@ -145,20 +146,71 @@ const TABS: { id: AppTab; label: string; icon: string }[] = [
   { id: "explorer", label: "Explorer", icon: "◐" },
 ];
 
-/** Build age warning — shows banner if running a build older than 24h */
-function BuildAgeBanner() {
-  const buildDate = new Date(__BUILD_TIMESTAMP__ + "Z");
-  const ageMs = Date.now() - buildDate.getTime();
-  const ageHours = ageMs / 3600000;
-  if (ageHours < 24) return null;
-  const ageDays = Math.floor(ageHours / 24);
+const GITHUB_REPO = "akoti02/composite-failure-surrogates";
+const CURRENT_VERSION = "0.1.0";
+
+interface ReleaseInfo {
+  tag: string;
+  version: string;
+  downloadUrl: string;
+}
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function UpdateBanner() {
+  const [release, setRelease] = useState<ReleaseInfo | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`)
+      .then(r => r.json())
+      .then(data => {
+        const tag = data.tag_name as string;
+        const version = tag.replace(/^v/, "");
+        if (compareVersions(version, CURRENT_VERSION) > 0) {
+          const exe = (data.assets as { name: string; browser_download_url: string }[])
+            ?.find(a => a.name.endsWith("-setup.exe"));
+          setRelease({
+            tag,
+            version,
+            downloadUrl: exe?.browser_download_url
+              ?? `https://github.com/${GITHUB_REPO}/releases/tag/${tag}`,
+          });
+        }
+      })
+      .catch(() => { /* offline or rate-limited — silently skip */ });
+  }, []);
+
+  if (!release || dismissed) return null;
+
   return (
     <div
-      className="text-[11px] text-center py-1 px-4"
+      className="flex items-center justify-center gap-3 text-[11px] py-1.5 px-4"
       style={{ background: "#7c3aed22", borderBottom: "1px solid #7c3aed44", color: "#c4b5fd" }}
     >
-      This build is {ageDays > 0 ? `${ageDays}d ` : ""}{Math.floor(ageHours % 24)}h old ({__BUILD_TIMESTAMP__}).
-      Run <code className="text-[10px] bg-black/30 px-1 rounded">npx tauri build</code> to update.
+      <span>Version {release.version} is available</span>
+      <button
+        className="px-3 py-0.5 rounded-md text-[11px] font-semibold cursor-pointer"
+        style={{ background: "#7c3aed", color: "#fff", border: "none" }}
+        onClick={() => openUrl(release.downloadUrl)}
+      >
+        Download update
+      </button>
+      <button
+        className="text-[11px] cursor-pointer"
+        style={{ color: "#c4b5fd80", background: "none", border: "none" }}
+        onClick={() => setDismissed(true)}
+      >
+        Dismiss
+      </button>
     </div>
   );
 }
@@ -382,7 +434,7 @@ function AppInner() {
 
   return (
     <div className="flex flex-col h-screen" style={{ background: COL.bg }}>
-      <BuildAgeBanner />
+      <UpdateBanner />
       <Header
         status={status} modelsReady={modelsReady} predicting={predicting}
         onPreset={handlePreset} onExport={handleExport} hasResults={results !== null}

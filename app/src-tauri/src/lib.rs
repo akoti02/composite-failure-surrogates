@@ -173,6 +173,7 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .manage(Sidecar(Arc::new(Mutex::new(proc))))
         .invoke_handler(tauri::generate_handler![load_models, predict])
         .setup(|app| {
