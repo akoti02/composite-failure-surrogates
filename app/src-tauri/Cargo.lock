@@ -3333,7 +3333,7 @@ dependencies = [
 
 [[package]]
 name = "rp3"
-version = "0.3.4"
+version = "0.3.7"
 dependencies = [
  "log",
  "serde",
