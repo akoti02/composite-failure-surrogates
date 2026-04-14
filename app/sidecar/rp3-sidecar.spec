@@ -64,7 +64,11 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,
+    # console=False → no flashing/persistent black shell window when Tauri
+    # spawns the sidecar. stdin/stdout still work because Tauri uses
+    # Stdio::piped() in lib.rs (spawn_sidecar). stderr is redirected to
+    # ~/.rp3/sidecar_stderr.log for post-mortem debugging.
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

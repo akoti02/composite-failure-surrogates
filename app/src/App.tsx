@@ -319,9 +319,10 @@ function UpdateBanner() {
   );
 }
 
-// Reference the version constant so rollout tooling can grep for it.
-const CURRENT_VERSION = "0.3.0";
-void CURRENT_VERSION;
+// Visible app version — shown in footer so users can confirm an update
+// landed. Update this together with Cargo.toml + tauri.conf.json on each
+// version bump (handled by the release workflow's tag).
+const APP_VERSION = "0.3.1";
 
 function AppInner() {
   const t = useT();
@@ -685,8 +686,9 @@ function AppInner() {
         )}
       </div>
 
-      <footer className="h-8 flex items-center justify-center text-[11px]" style={{ color: COL.textDim, background: COL.bgDark, borderTop: `1px solid ${COL.border}` }}>
-        {t("app_subtitle")}&nbsp;&nbsp;·&nbsp;&nbsp;AENG30017&nbsp;&nbsp;·&nbsp;&nbsp;{t("footer_student")}
+      <footer className="h-8 flex items-center justify-center gap-3 text-[11px]" style={{ color: COL.textDim, background: COL.bgDark, borderTop: `1px solid ${COL.border}` }}>
+        <span>{t("app_subtitle")}&nbsp;&nbsp;·&nbsp;&nbsp;AENG30017&nbsp;&nbsp;·&nbsp;&nbsp;{t("footer_student")}</span>
+        <span style={{ color: COL.accent, opacity: 0.7, textShadow: "0 0 6px rgba(0,234,255,0.3)" }}>v{APP_VERSION}</span>
       </footer>
 
       {/* Focus Modals */}
