@@ -7,10 +7,9 @@ interface Props {
   defects: DefectParams[];
   pressureX: number;
   pressureY: number;
-  layupRotation: number;
 }
 
-export function PlateCanvas({ nDefects, defects, pressureX, pressureY, layupRotation }: Props) {
+export function PlateCanvas({ nDefects, defects, pressureX, pressureY }: Props) {
   const mx = 50, my = 28;
   const pw = 300, ph = 150;
   const sx = pw / PLATE_LENGTH;
@@ -156,8 +155,7 @@ export function PlateCanvas({ nDefects, defects, pressureX, pressureY, layupRota
           <polygon points="0 0, 7 2.5, 0 5" fill="#60a5fa" opacity="0.7" />
         </marker>
         {/* Fiber direction pattern */}
-        <pattern id="fiberPattern" width="6" height="6" patternUnits="userSpaceOnUse"
-          patternTransform={`rotate(${layupRotation})`}>
+        <pattern id="fiberPattern" width="6" height="6" patternUnits="userSpaceOnUse">
           <line x1="3" y1="0" x2="3" y2="6" stroke="rgba(99,102,241,0.06)" strokeWidth="0.8" />
         </pattern>
         {/* Glow filters for each defect color */}

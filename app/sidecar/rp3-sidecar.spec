@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os, sys, sysconfig
 from PyInstaller.utils.hooks import collect_submodules
 
 # Only collect sklearn.preprocessing and its minimal dependencies
@@ -10,11 +11,22 @@ sklearn_imports = (
 # Remove test modules
 sklearn_imports = [m for m in sklearn_imports if '.tests' not in m and '.test_' not in m]
 
+# Dynamically locate xgboost files instead of hardcoding user paths
+import xgboost as _xgb
+_xgb_dir = os.path.dirname(_xgb.__file__)
+_xgb_dll = os.path.join(_xgb_dir, 'lib', 'xgboost.dll')
+_xgb_ver = os.path.join(_xgb_dir, 'VERSION')
+
+_binaries = [(_xgb_dll, 'xgboost/lib')] if os.path.exists(_xgb_dll) else []
+_datas = [('_models_data.py', '.')]
+if os.path.exists(_xgb_ver):
+    _datas.insert(0, (_xgb_ver, 'xgboost'))
+
 a = Analysis(
     ['server.py'],
     pathex=[],
-    binaries=[('C:/Users/akoti/AppData/Local/Programs/Python/Python313/Lib/site-packages/xgboost/lib/xgboost.dll', 'xgboost/lib')],
-    datas=[('C:/Users/akoti/AppData/Local/Programs/Python/Python313/Lib/site-packages/xgboost/VERSION', 'xgboost'), ('_models_data.py', '.')],
+    binaries=_binaries,
+    datas=_datas,
     hiddenimports=sklearn_imports + [
         'sklearn', 'sklearn.base', 'sklearn.exceptions',
         'xgboost', 'xgboost.core', 'xgboost.compat',

@@ -14,8 +14,9 @@ interface Props {
   nDefects: number;
   pressureX: number;
   pressureY: number;
-  plyThickness: number;
-  layupRotation: number;
+  materialKey: string;
+  layupKey: string;
+  bcMode: string;
   defects: DefectParams[];
   results: PredictionResults | null;
   // Callback to restore a snapshot
@@ -94,10 +95,10 @@ function SnapshotCard({ snapshot, isActive, isComparing, onRestore, onDelete, on
             <span style={{ color: hasFailed ? COL.danger : COL.success }}>
               {hasFailed ? "FAIL" : "PASS"}
             </span>
-            {snapshot.results?.max_mises != null && (
+            {snapshot.results?.max_s11 != null && (
               <>
                 <span>·</span>
-                <span>{snapshot.results.max_mises.toFixed(0)} MPa</span>
+                <span>S11={snapshot.results.max_s11.toFixed(0)} MPa</span>
               </>
             )}
           </>
@@ -135,13 +136,13 @@ function ComparisonView({ snapshots }: { snapshots: AnalysisSnapshot[] }) {
   }
 
   const fields: { key: keyof PredictionResults; label: string; unit: string; danger?: number }[] = [
-    { key: "max_mises", label: "Peak von Mises", unit: "MPa" },
     { key: "tsai_wu_index", label: "Tsai-Wu Index", unit: "", danger: 1 },
     { key: "max_s11", label: "Max S11", unit: "MPa" },
     { key: "min_s11", label: "Min S11", unit: "MPa" },
     { key: "max_s12", label: "Max S12", unit: "MPa" },
     { key: "max_hashin_ft", label: "Hashin FT", unit: "", danger: 1 },
     { key: "max_hashin_mt", label: "Hashin MT", unit: "", danger: 1 },
+    { key: "max_hashin_mc", label: "Hashin MC", unit: "", danger: 1 },
   ];
 
   return (
@@ -261,7 +262,7 @@ function HistoryPanel() {
               <span style={{ color: COL.textDim }}>{formatTime(h.timestamp)}</span>
               <span style={{ color: COL.textMid }}>{h.nDefects}d Px={h.pressureX}</span>
               <span className="ml-auto tabular-nums" style={{ color: COL.text }}>
-                {h.maxMises != null ? `${h.maxMises.toFixed(0)} MPa` : "--"}
+                {h.maxS11 != null ? `S11=${h.maxS11.toFixed(0)} MPa` : "--"}
               </span>
               <span style={{ color: failed ? COL.danger : COL.success }}>
                 {failed == null ? "·" : failed ? "FAIL" : "PASS"}
@@ -275,7 +276,7 @@ function HistoryPanel() {
 }
 
 export function ProjectManager({
-  nDefects, pressureX, pressureY, plyThickness, layupRotation, defects, results,
+  nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, results,
   onRestoreSnapshot, compareSnapshots, onToggleCompare,
 }: Props) {
   const [project, setProject] = useState<Project>(() => loadProject() || createProject());
@@ -290,10 +291,10 @@ export function ProjectManager({
 
   const handleSave = useCallback(() => {
     const name = saveName.trim() || `Analysis ${project.snapshots.length + 1}`;
-    const snap = createSnapshot(name, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects, results);
+    const snap = createSnapshot(name, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, results);
     setProject(prev => addSnapshot(prev, snap));
     setSaveName("");
-  }, [saveName, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects, results, project.snapshots.length]);
+  }, [saveName, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, results, project.snapshots.length]);
 
   const handleDelete = useCallback((id: string) => {
     setProject(prev => removeSnapshot(prev, id));

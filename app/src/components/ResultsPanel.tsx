@@ -1,4 +1,4 @@
-import { COL, DEFECT_COLORS, TOOLTIPS } from "../lib/constants";
+import { COL, TOOLTIPS } from "../lib/constants";
 import { VerdictCard } from "./VerdictCard";
 import type { PredictionResults } from "../lib/types";
 
@@ -80,46 +80,6 @@ function GaugeRow({ label, value, formattedValue, color, threshold = 1.0, toolti
   );
 }
 
-function DefectBar({ index, value, maxValue, active, delay }: {
-  index: number; value?: number; maxValue: number; active: boolean; delay: number;
-}) {
-  const hasValue = value != null && isFinite(value) && active;
-  const ratio = hasValue ? Math.min(value / Math.max(maxValue, 1), 1) : 0;
-  const formatted = hasValue
-    ? `${value.toLocaleString("en", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MPa`
-    : "--";
-
-  return (
-    <div
-      className="flex items-center gap-2.5 h-8 px-3 rounded-lg row-reveal result-row"
-      style={{
-        background: COL.card,
-        border: `1px solid ${COL.border}`,
-        animationDelay: `${delay}ms`,
-        opacity: active ? 1 : 0.3,
-      }}
-    >
-      <span className="text-[10px]" style={{ color: active ? DEFECT_COLORS[index] : COL.textDim }}>&#x25CF;</span>
-      <span className="text-[11px] w-12 shrink-0" style={{ color: COL.textMid }}>#{index + 1}</span>
-      <div className="flex-1 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)" }}>
-        {hasValue && (
-          <div
-            className="h-full rounded-full gauge-fill"
-            style={{
-              width: `${ratio * 100}%`,
-              background: DEFECT_COLORS[index],
-              animationDelay: `${delay + 100}ms`,
-            }}
-          />
-        )}
-      </div>
-      <span className="text-[11px] font-semibold tabular-nums w-20 text-right" style={{ color: active ? COL.text : COL.textDim }}>
-        {formatted}
-      </span>
-    </div>
-  );
-}
-
 function fmtStress(val?: number): { value: string; color: string; subtext?: string } {
   if (val == null || !isFinite(val)) return { value: "--", color: COL.textDim };
   return {
@@ -141,23 +101,15 @@ function fmtBool(val?: number): { value: string; color: string } {
     : { value: "FAIL", color: COL.danger };
 }
 
-export function ResultsPanel({ results, nDefects, onExpandModal }: Props) {
+export function ResultsPanel({ results, nDefects: _nDefects, onExpandModal }: Props) {
   const r = results;
 
-  let maxDefectStress = 0;
-  for (let i = 1; i <= nDefects; i++) {
-    const key = `max_mises_defect${i}` as keyof PredictionResults;
-    const v = r?.[key] as number | undefined;
-    if (v != null && isFinite(v) && v > maxDefectStress) maxDefectStress = v;
-  }
-
   const hft = fmtIndex(r?.max_hashin_ft);
-  const hfc = fmtIndex(r?.max_hashin_fc);
   const hmt = fmtIndex(r?.max_hashin_mt);
   const hmc = fmtIndex(r?.max_hashin_mc);
 
   // Use a key that changes when results arrive to re-trigger entrance animations
-  const animKey = r ? `r-${r.max_mises}-${r.tsai_wu_index}` : "empty";
+  const animKey = r ? `r-${r.tsai_wu_index}-${r.max_s11}` : "empty";
 
   return (
     <div className="overflow-y-auto px-4 py-3 flex flex-col gap-1">
@@ -189,43 +141,26 @@ export function ResultsPanel({ results, nDefects, onExpandModal }: Props) {
 
       {results && (
         <div key={animKey} className="flex flex-col gap-1">
-          <SectionHeader text="Stress Analysis" tooltip={TOOLTIPS.mises} />
+          <SectionHeader text="Stress Analysis" tooltip={TOOLTIPS.s11} />
           <div className="flex flex-col gap-1">
-            <ResultRow label="Peak Stress (von Mises)" {...fmtStress(r?.max_mises)} tooltip="Combined equivalent stress" delay={0} />
-            <ResultRow label="Max Fibre Stress (S11)" {...fmtStress(r?.max_s11)} tooltip="Maximum stress in fibre direction" delay={40} />
-            <ResultRow label="Min Fibre Stress (S11)" {...fmtStress(r?.min_s11)} tooltip="Minimum stress (compression)" delay={80} />
-            <ResultRow label="Peak Shear (S12)" {...fmtStress(r?.max_s12)} tooltip="Maximum in-plane shear stress" delay={120} />
+            <ResultRow label="Max Fibre Stress (S11)" {...fmtStress(r?.max_s11)} tooltip="Maximum stress in fibre direction" delay={0} />
+            <ResultRow label="Min Fibre Stress (S11)" {...fmtStress(r?.min_s11)} tooltip="Minimum stress (compression)" delay={40} />
+            <ResultRow label="Peak Shear (S12)" {...fmtStress(r?.max_s12)} tooltip="Maximum in-plane shear stress" delay={80} />
           </div>
 
           <SectionHeader text="Failure Assessment" tooltip={TOOLTIPS.tsai_wu} />
           <div className="flex flex-col gap-1">
             <ResultRow label="Tsai-Wu Verdict" {...fmtBool(r?.failed_tsai_wu)} delay={0} />
+            <ResultRow label="Hashin Verdict" {...fmtBool(r?.failed_hashin)} delay={40} />
+            <ResultRow label="Puck Verdict" {...fmtBool(r?.failed_puck)} tooltip="Puck failure criterion" delay={80} />
+            <ResultRow label="LaRC Verdict" {...fmtBool(r?.failed_larc)} tooltip="LaRC failure criterion" delay={120} />
           </div>
 
           <SectionHeader text="Damage Modes (Hashin)" tooltip={TOOLTIPS.hashin} />
           <div className="flex flex-col gap-1">
             <GaugeRow label="Fibre Tension" value={hft.value} formattedValue={hft.formatted} color={hft.color} tooltip="Fibre tensile failure index" delay={0} />
-            <GaugeRow label="Fibre Compression" value={hfc.value} formattedValue={hfc.formatted} color={hfc.color} tooltip="Fibre compressive failure index" delay={40} />
-            <GaugeRow label="Matrix Tension" value={hmt.value} formattedValue={hmt.formatted} color={hmt.color} tooltip="Matrix tensile failure index" delay={80} />
-            <GaugeRow label="Matrix Compression" value={hmc.value} formattedValue={hmc.formatted} color={hmc.color} tooltip="Matrix compressive failure index" delay={120} />
-            <ResultRow label="Hashin Verdict" {...fmtBool(r?.failed_hashin)} delay={160} />
-          </div>
-
-          <SectionHeader text="Per-Defect Peak Stress" />
-          <div className="flex flex-col gap-1">
-            {Array.from({ length: nDefects }, (_, i) => {
-              const key = `max_mises_defect${i + 1}` as keyof PredictionResults;
-              return (
-                <DefectBar
-                  key={i}
-                  index={i}
-                  value={r?.[key] as number | undefined}
-                  maxValue={maxDefectStress}
-                  active={true}
-                  delay={i * 40}
-                />
-              );
-            })}
+            <GaugeRow label="Matrix Tension" value={hmt.value} formattedValue={hmt.formatted} color={hmt.color} tooltip="Matrix tensile failure index" delay={40} />
+            <GaugeRow label="Matrix Compression" value={hmc.value} formattedValue={hmc.formatted} color={hmc.color} tooltip="Matrix compressive failure index" delay={80} />
           </div>
         </div>
       )}

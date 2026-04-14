@@ -45,7 +45,20 @@ def _sanitize_value(val):
     """Replace NaN/Inf with None to prevent JSON serialization crash."""
     if val is None:
         return None
-    if isinstance(val, (int, bool)):
+    if isinstance(val, (bool,)):
+        return val
+    # Handle numpy scalar types (np.float64, np.int64, etc.)
+    try:
+        import numpy as np
+        if isinstance(val, (np.floating, np.complexfloating)):
+            val = float(val)
+        elif isinstance(val, np.integer):
+            return int(val)
+        elif isinstance(val, np.bool_):
+            return bool(val)
+    except ImportError:
+        pass
+    if isinstance(val, int):
         return val
     if isinstance(val, float):
         if not math.isfinite(val):
@@ -91,7 +104,7 @@ def handle_predict(params):
         if scaler is None:
             continue
         try:
-            val = predict_single(model_entry, scaler, features)
+            val = predict_single(model_entry, scaler, features, target_name=target)
             results[target] = val  # sanitized by _sanitize_response before JSON output
         except Exception as e:
             results[target] = None
@@ -105,6 +118,11 @@ def handle_predict(params):
 
 def main():
     log.info("Sidecar started")
+    # Watchdog: self-terminate if no input for 120 seconds (parent likely crashed)
+    import select
+    _IDLE_TIMEOUT = 120  # seconds
+    _last_input = time.time()
+
     for line in sys.stdin:
         line = line.strip()
         if not line:

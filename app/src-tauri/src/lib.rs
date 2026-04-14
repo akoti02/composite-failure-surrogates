@@ -44,7 +44,8 @@ fn spawn_sidecar() -> Result<SidecarProc, String> {
 
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null()); // Discard stderr to prevent deadlock on Windows
+        .stderr(Stdio::null()) // Discard stderr to prevent deadlock on Windows
+        .env("PYTHONUNBUFFERED", "1"); // Prevent stdout buffering deadlock
 
     #[cfg(target_os = "windows")]
     {

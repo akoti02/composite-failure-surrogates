@@ -1,111 +1,74 @@
 /**
- * Composite material property database.
- * All properties in SI-consistent units: GPa for moduli, MPa for strengths.
- * Sources: MIL-HDBK-17, ESDU datasheets, manufacturer TDS.
+ * V11 Composite material property database.
+ * These 5 materials match the V11 CompositeBench training dataset exactly.
+ * Properties in MPa (moduli and strengths).
  */
 
 export interface MaterialProperties {
-  id: string;
+  id: number;       // V11 material_id (used by ML models)
   name: string;
   description: string;
-  // Elastic constants (GPa)
-  E1: number;   // Longitudinal modulus
-  E2: number;   // Transverse modulus
-  G12: number;  // In-plane shear modulus
+  E1: number;   // Longitudinal modulus (MPa)
+  E2: number;   // Transverse modulus (MPa)
+  G12: number;  // In-plane shear modulus (MPa)
   v12: number;  // Major Poisson's ratio
-  // Strength (MPa)
-  Xt: number;   // Longitudinal tensile strength
-  Xc: number;   // Longitudinal compressive strength
-  Yt: number;   // Transverse tensile strength
-  Yc: number;   // Transverse compressive strength
-  S12: number;  // In-plane shear strength
-  // Thermal (1/°C) — optional
-  alpha1?: number;  // CTE longitudinal
-  alpha2?: number;  // CTE transverse
-  // Density (g/cm³) — optional
-  density?: number;
-  // Ply thickness (mm)
-  plyThickness: number;
+  Xt: number;   // Longitudinal tensile strength (MPa)
+  Xc: number;   // Longitudinal compressive strength (MPa)
+  Yt: number;   // Transverse tensile strength (MPa)
+  Yc: number;   // Transverse compressive strength (MPa)
+  S12: number;  // In-plane shear strength (MPa)
+  plyThickness: number;  // mm
 }
 
-/** Aerospace-grade CFRP materials */
 export const MATERIAL_DB: Record<string, MaterialProperties> = {
   "T300/5208": {
-    id: "T300/5208",
-    name: "T300/5208",
-    description: "Standard modulus carbon/epoxy (Toray T300, Cytec 5208). Widely used benchmark.",
-    E1: 181.0, E2: 10.3, G12: 7.17, v12: 0.28,
-    Xt: 1500, Xc: 1500, Yt: 40, Yc: 246, S12: 68,
-    alpha1: -0.018e-6, alpha2: 24.3e-6,
-    density: 1.58, plyThickness: 0.125,
-  },
-  "AS4/3501-6": {
-    id: "AS4/3501-6",
-    name: "AS4/3501-6",
-    description: "Hercules AS4 fiber, 3501-6 toughened epoxy. Common aerospace prepreg.",
-    E1: 147.0, E2: 10.3, G12: 7.0, v12: 0.27,
-    Xt: 2280, Xc: 1440, Yt: 57, Yc: 228, S12: 71,
-    alpha1: -0.9e-6, alpha2: 27.0e-6,
-    density: 1.58, plyThickness: 0.125,
+    id: 1, name: "T300/5208",
+    description: "Standard modulus CFRP. Most-cited benchmark in composites literature.",
+    E1: 135000, E2: 10000, G12: 5200, v12: 0.27,
+    Xt: 1500, Xc: 1200, Yt: 50, Yc: 250, S12: 70,
+    plyThickness: 0.15,
   },
   "IM7/8552": {
-    id: "IM7/8552",
-    name: "IM7/8552",
-    description: "Intermediate modulus carbon, Hexcel 8552 toughened epoxy. Primary structure grade.",
-    E1: 171.4, E2: 9.08, G12: 5.29, v12: 0.32,
-    Xt: 2326, Xc: 1200, Yt: 62.3, Yc: 199.8, S12: 92.3,
-    alpha1: -0.09e-6, alpha2: 28.8e-6,
-    density: 1.59, plyThickness: 0.131,
+    id: 5, name: "IM7/8552",
+    description: "Intermediate modulus, toughened epoxy. Aerospace primary structure grade.",
+    E1: 171400, E2: 9080, G12: 5290, v12: 0.32,
+    Xt: 2326, Xc: 1200, Yt: 62, Yc: 200, S12: 92,
+    plyThickness: 0.15,
   },
-  "T700/2510": {
-    id: "T700/2510",
-    name: "T700/2510",
-    description: "Toray T700 high-strength fiber, Cytec 2510 OOA epoxy. Out-of-autoclave capable.",
-    E1: 132.0, E2: 10.3, G12: 6.5, v12: 0.25,
-    Xt: 2400, Xc: 1300, Yt: 55, Yc: 210, S12: 75,
-    density: 1.56, plyThickness: 0.127,
-  },
-  "E-Glass/Epoxy": {
-    id: "E-Glass/Epoxy",
-    name: "E-Glass/Epoxy",
-    description: "E-glass fiber reinforced epoxy. Lower cost, moderate performance.",
-    E1: 38.6, E2: 8.27, G12: 4.14, v12: 0.26,
-    Xt: 1062, Xc: 610, Yt: 31, Yc: 118, S12: 72,
-    alpha1: 8.6e-6, alpha2: 22.1e-6,
-    density: 2.10, plyThickness: 0.150,
-  },
-  "S2-Glass/Epoxy": {
-    id: "S2-Glass/Epoxy",
-    name: "S2-Glass/Epoxy",
-    description: "S2-glass high-strength fiber/epoxy. Ballistic and impact applications.",
-    E1: 43.0, E2: 8.9, G12: 4.5, v12: 0.27,
-    Xt: 1280, Xc: 690, Yt: 49, Yc: 158, S12: 69,
-    density: 1.99, plyThickness: 0.140,
+  "E-glass/Epoxy": {
+    id: 8, name: "E-glass/Epoxy",
+    description: "Glass fiber reinforced epoxy. Lower cost, fundamentally different failure behavior.",
+    E1: 39000, E2: 8600, G12: 3800, v12: 0.28,
+    Xt: 1000, Xc: 700, Yt: 40, Yc: 120, S12: 70,
+    plyThickness: 0.15,
   },
   "Kevlar49/Epoxy": {
-    id: "Kevlar49/Epoxy",
-    name: "Kevlar 49/Epoxy",
-    description: "Aramid fiber reinforced epoxy. High toughness, poor compression.",
-    E1: 76.0, E2: 5.5, G12: 2.3, v12: 0.34,
+    id: 12, name: "Kevlar 49/Epoxy",
+    description: "Aramid fiber reinforced epoxy. Unique tension/compression asymmetry.",
+    E1: 80000, E2: 5500, G12: 2200, v12: 0.34,
     Xt: 1400, Xc: 335, Yt: 30, Yc: 158, S12: 49,
-    alpha1: -4.0e-6, alpha2: 79.0e-6,
-    density: 1.38, plyThickness: 0.125,
+    plyThickness: 0.15,
+  },
+  "Flax/Epoxy": {
+    id: 15, name: "Flax/Epoxy",
+    description: "Natural fiber composite. Low-performance extreme, tests model generalization.",
+    E1: 35000, E2: 5500, G12: 3000, v12: 0.30,
+    Xt: 350, Xc: 150, Yt: 25, Yc: 100, S12: 40,
+    plyThickness: 0.15,
   },
 };
 
 export const DEFAULT_MATERIAL_ID = "T300/5208";
 
-/** Derived: minor Poisson's ratio v21 = v12 * E2 / E1 */
 export function v21(m: MaterialProperties): number {
   return m.v12 * m.E2 / m.E1;
 }
 
-/** Reduced stiffness matrix Q (plane stress) in material axes, GPa */
 export function reducedStiffness(m: MaterialProperties): [number, number, number, number] {
   const nu21 = v21(m);
   const denom = 1 - m.v12 * nu21;
   if (denom <= 0) {
-    throw new Error(`Invalid material: 1 - v12*v21 = ${denom.toFixed(6)} <= 0 (v12=${m.v12}, E1=${m.E1}, E2=${m.E2})`);
+    throw new Error(`Invalid material: 1 - v12*v21 = ${denom.toFixed(6)} <= 0`);
   }
   const Q11 = m.E1 / denom;
   const Q22 = m.E2 / denom;
@@ -114,7 +77,6 @@ export function reducedStiffness(m: MaterialProperties): [number, number, number
   return [Q11, Q12, Q22, Q66];
 }
 
-/** Transformed reduced stiffness Qbar for a ply at angle theta (degrees), GPa */
 export function transformedStiffness(m: MaterialProperties, theta: number): number[][] {
   const [Q11, Q12, Q22, Q66] = reducedStiffness(m);
   const rad = (theta * Math.PI) / 180;
@@ -136,3 +98,59 @@ export function transformedStiffness(m: MaterialProperties, theta: number): numb
     [Qbar16, Qbar26, Qbar66],
   ];
 }
+
+/**
+ * V11 layup definitions — 6 selected, all symmetric (B matrix = 0).
+ */
+export interface LayupDefinition {
+  id: number;       // V11 layup_id (used by ML models)
+  name: string;
+  description: string;
+  angles: number[];
+}
+
+export const LAYUP_DB: Record<string, LayupDefinition> = {
+  "QI_8": {
+    id: 1, name: "QI [0/45/-45/90]s",
+    description: "Quasi-isotropic 8-ply. Balanced failure modes.",
+    angles: [0, 45, -45, 90, 90, -45, 45, 0],
+  },
+  "CP_8": {
+    id: 3, name: "CP [0/90]2s",
+    description: "Cross-ply 8-ply. Distinct 0/90 interaction.",
+    angles: [0, 90, 0, 90, 90, 0, 90, 0],
+  },
+  "UD_0_8": {
+    id: 4, name: "UD [0]8",
+    description: "Unidirectional 8-ply. Pure fiber-dominated response.",
+    angles: [0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  "Angle_pm45": {
+    id: 6, name: "[±45]2s",
+    description: "±45 angle-ply. Shear-dominated, exercises matrix failure.",
+    angles: [45, -45, 45, -45, -45, 45, -45, 45],
+  },
+  "Angle_pm30": {
+    id: 7, name: "[±30]2s",
+    description: "±30 angle-ply. Off-axis mixed fiber/matrix response.",
+    angles: [30, -30, 30, -30, -30, 30, -30, 30],
+  },
+  "Skin_25_50_25": {
+    id: 13, name: "Skin 25/50/25",
+    description: "Aerospace realistic 18-ply. Multi-angle with thickness.",
+    angles: [45, -45, 0, 0, 90, 0, 0, -45, 45, 45, -45, 0, 0, 90, 0, 0, -45, 45],
+  },
+};
+
+export const DEFAULT_LAYUP_ID = "QI_8";
+
+/**
+ * V11 boundary conditions — 3 modes.
+ */
+export const BC_MODES = [
+  { id: "tension_comp", name: "Tension + Compression", description: "px on right, -py on top/bottom" },
+  { id: "biaxial", name: "Biaxial", description: "px on right, py on top/bottom" },
+  { id: "uniaxial_shear", name: "Uniaxial + Shear", description: "px on right, shear via X-force on top" },
+] as const;
+
+export const DEFAULT_BC_MODE = "tension_comp";

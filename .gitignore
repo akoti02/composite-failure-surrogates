@@ -18,13 +18,23 @@ cachedir/
 *.sim
 *.stt
 .DS_Store
-*.ico_models_data.py
 dist/
 
 # App build artifacts
 app/node_modules/
 app/dist/
 app/src-tauri/target/
+app/sidecar/build/
+app/sidecar/dist/
 app/screenshots/
 app/test-screenshots/
 app/test_screenshots/
+
+# Server backups (large binaries)
+server_backup_*/
+
+# Trained model files (large, use _models_data.py blob for app)
+ml/v11/trained_models/*.joblib
+ml/v11/trained_models/*.cbm
+ml/v11/trained_models/*.pt
+ml/v11/trained_models/*.tar.gz

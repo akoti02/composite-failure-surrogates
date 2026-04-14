@@ -52,6 +52,10 @@ pip3 install numpy xgboost scikit-learn pyinstaller
 echo ""
 echo "Building macOS sidecar binary..."
 cd sidecar
+if [ ! -f _models_data.py ]; then
+    echo "ERROR: _models_data.py not found in sidecar/. Cannot build without model data."
+    exit 1
+fi
 pyinstaller --onefile --name rp3-sidecar server.py \
   --hidden-import inference --hidden-import _models_data \
   --add-data "_models_data.py:."

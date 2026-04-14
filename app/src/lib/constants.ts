@@ -47,8 +47,9 @@ export const COL = {
 export const TOOLTIPS: Record<string, string> = {
   pressure_x: "Applied pressure in the fibre direction (longitudinal)",
   pressure_y: "Applied pressure transverse to the fibre direction",
-  ply_thickness: "Thickness of a single composite ply",
-  layup_rotation: "Rotation of the laminate layup schedule",
+  material: "Composite material system (fibre/matrix)",
+  layup: "Laminate stacking sequence",
+  bc_mode: "Boundary condition and loading mode",
   half_length: "Half the crack/defect length (semi-major axis)",
   width: "Opening width of the defect",
   angle: "Orientation of the defect relative to the fibre direction",

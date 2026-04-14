@@ -2,14 +2,16 @@ import { useState, useEffect } from "react";
 import { COL, DEFECT_COLORS, MAX_DEFECTS, PLATE_LENGTH, PLATE_WIDTH, TOOLTIPS } from "../lib/constants";
 import { NumberInput } from "./NumberInput";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { MATERIAL_DB, LAYUP_DB, BC_MODES } from "../lib/materials";
 import type { DefectParams } from "../lib/types";
 
 interface Props {
   nDefects: number; setNDefects: (n: number) => void;
   pressureX: number; setPressureX: (v: number) => void;
   pressureY: number; setPressureY: (v: number) => void;
-  plyThickness: number; setPlyThickness: (v: number) => void;
-  layupRotation: number; setLayupRotation: (v: number) => void;
+  materialKey: string; setMaterialKey: (v: string) => void;
+  layupKey: string; setLayupKey: (v: string) => void;
+  bcMode: string; setBcMode: (v: string) => void;
   defects: DefectParams[];
   updateDefect: (i: number, field: keyof DefectParams, value: number) => void;
 }
@@ -87,9 +89,15 @@ function DefectTabBar({ nDefects, activeTab, onSelect, defects }: {
   );
 }
 
+const selectStyle = {
+  background: COL.panel,
+  border: `1px solid ${COL.border}`,
+  color: COL.text,
+};
+
 export function InputPanel({
   nDefects, setNDefects, pressureX, setPressureX, pressureY, setPressureY,
-  plyThickness, setPlyThickness, layupRotation, setLayupRotation,
+  materialKey, setMaterialKey, layupKey, setLayupKey, bcMode, setBcMode,
   defects, updateDefect,
 }: Props) {
   const [activeDefect, setActiveDefect] = useState(0);
@@ -101,6 +109,9 @@ export function InputPanel({
   }, [clampedActive, activeDefect]);
 
   const d = defects[clampedActive];
+  const mat = MATERIAL_DB[materialKey];
+  const layup = LAYUP_DB[layupKey];
+  const bc = BC_MODES.find(b => b.id === bcMode);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-0.5 min-h-0">
@@ -118,11 +129,59 @@ export function InputPanel({
         <CollapsibleSection
           title="Material & Layup"
           icon="◈"
-          summary={`t=${plyThickness}mm, θ=${layupRotation}°`}
+          summary={`${mat?.name ?? materialKey} / ${layup?.name ?? layupKey}`}
           defaultOpen={false}
         >
-          <NumberInput label="Ply Thickness" value={plyThickness} onChange={setPlyThickness} unit="mm" step={0.01} min={0.05} max={1.0} tooltip={TOOLTIPS.ply_thickness} />
-          <NumberInput label="Layup Rotation" value={layupRotation} onChange={setLayupRotation} unit="deg" step={5} min={-90} max={90} tooltip={TOOLTIPS.layup_rotation} />
+          <div className="flex flex-col gap-2 py-1">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold" style={{ color: COL.textDim }} data-tooltip={TOOLTIPS.material}>Material</label>
+              <select
+                className="text-[11px] px-2.5 py-1.5 rounded-md outline-none w-full"
+                style={selectStyle}
+                value={materialKey}
+                onChange={(e) => setMaterialKey(e.target.value)}
+              >
+                {Object.entries(MATERIAL_DB).map(([key, m]) => (
+                  <option key={key} value={key}>{m.name}</option>
+                ))}
+              </select>
+              {mat && (
+                <span className="text-[9px] px-1" style={{ color: COL.textDim }}>{mat.description}</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold" style={{ color: COL.textDim }} data-tooltip={TOOLTIPS.layup}>Layup</label>
+              <select
+                className="text-[11px] px-2.5 py-1.5 rounded-md outline-none w-full"
+                style={selectStyle}
+                value={layupKey}
+                onChange={(e) => setLayupKey(e.target.value)}
+              >
+                {Object.entries(LAYUP_DB).map(([key, l]) => (
+                  <option key={key} value={key}>{l.name}</option>
+                ))}
+              </select>
+              {layup && (
+                <span className="text-[9px] px-1" style={{ color: COL.textDim }}>{layup.description}</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-semibold" style={{ color: COL.textDim }} data-tooltip={TOOLTIPS.bc_mode}>BC Mode</label>
+              <select
+                className="text-[11px] px-2.5 py-1.5 rounded-md outline-none w-full"
+                style={selectStyle}
+                value={bcMode}
+                onChange={(e) => setBcMode(e.target.value)}
+              >
+                {BC_MODES.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              {bc && (
+                <span className="text-[9px] px-1" style={{ color: COL.textDim }}>{bc.description}</span>
+              )}
+            </div>
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection

@@ -4,6 +4,7 @@ import { mapColor } from "../lib/stress-field";
 import { invoke } from "@tauri-apps/api/core";
 import type { RawInputs, PredictionResults } from "../lib/types";
 import { DEFAULT_DEFECT } from "../lib/presets";
+import { MATERIAL_DB, LAYUP_DB } from "../lib/materials";
 
 /** Parameter definition for sweeps */
 interface SweepParam {
@@ -18,8 +19,6 @@ interface SweepParam {
 const SWEEP_PARAMS: SweepParam[] = [
   { id: "pressure_x", label: "Pressure X", min: -500, max: 500, default: 100, unit: "MPa" },
   { id: "pressure_y", label: "Pressure Y", min: -500, max: 500, default: 0, unit: "MPa" },
-  { id: "ply_thickness", label: "Ply Thickness", min: 0.05, max: 1.0, default: 0.125, unit: "mm" },
-  { id: "layup_rotation", label: "Layup Rotation", min: -90, max: 90, default: 0, unit: "deg" },
   { id: "defect1_half_length", label: "Defect 1 Half-Length", min: 0.1, max: 50, default: 10, unit: "mm" },
   { id: "defect1_width", label: "Defect 1 Width", min: 0.01, max: 10, default: 1, unit: "mm" },
   { id: "defect1_angle", label: "Defect 1 Angle", min: -90, max: 90, default: 0, unit: "deg" },
@@ -27,13 +26,11 @@ const SWEEP_PARAMS: SweepParam[] = [
 ];
 
 const OUTPUT_FIELDS: { id: keyof PredictionResults; label: string; unit: string }[] = [
-  { id: "max_mises", label: "Peak von Mises", unit: "MPa" },
   { id: "tsai_wu_index", label: "Tsai-Wu Index", unit: "" },
   { id: "max_s11", label: "Max S11", unit: "MPa" },
   { id: "min_s11", label: "Min S11", unit: "MPa" },
   { id: "max_s12", label: "Max S12", unit: "MPa" },
   { id: "max_hashin_ft", label: "Hashin FT", unit: "" },
-  { id: "max_hashin_fc", label: "Hashin FC", unit: "" },
   { id: "max_hashin_mt", label: "Hashin MT", unit: "" },
   { id: "max_hashin_mc", label: "Hashin MC", unit: "" },
 ];
@@ -66,19 +63,23 @@ interface ExplorerProps {
   nDefects: number;
   pressureX: number;
   pressureY: number;
-  plyThickness: number;
-  layupRotation: number;
+  materialKey: string;
+  layupKey: string;
+  bcMode: string;
   defects: import("../lib/types").DefectParams[];
   modelsReady: boolean;
 }
 
 function buildBaseInputs(props: ExplorerProps, overrides: Record<string, number>): RawInputs {
+  const mat = MATERIAL_DB[props.materialKey];
+  const layup = LAYUP_DB[props.layupKey];
   const raw: RawInputs = {
     n_defects: overrides.n_defects ?? props.nDefects,
     pressure_x: overrides.pressure_x ?? props.pressureX,
     pressure_y: overrides.pressure_y ?? props.pressureY,
-    ply_thickness: overrides.ply_thickness ?? props.plyThickness,
-    layup_rotation: overrides.layup_rotation ?? props.layupRotation,
+    material_id: mat?.id ?? 1,
+    layup_id: layup?.id ?? 1,
+    bc_mode: props.bcMode,
   };
   const defects = props.defects;
   for (let i = 0; i < MAX_DEFECTS; i++) {
@@ -291,8 +292,8 @@ function SensitivityBars({ params, indices, title, width = 360, height = 200 }: 
 export function DesignExplorer(props: ExplorerProps) {
   const [mode, setMode] = useState<ExplorerMode>("sweep1d");
   const [paramX, setParamX] = useState("pressure_x");
-  const [paramY, setParamY] = useState("ply_thickness");
-  const [outputField, setOutputField] = useState<keyof PredictionResults>("max_mises");
+  const [paramY, setParamY] = useState("pressure_y");
+  const [outputField, setOutputField] = useState<keyof PredictionResults>("tsai_wu_index");
   const [nSteps, setNSteps] = useState(20);
   const [nSamples, setNSamples] = useState(200);
   const [running, setRunning] = useState(false);

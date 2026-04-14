@@ -46,22 +46,27 @@ import { DesignExplorer } from "./components/DesignExplorer";
 import type { RawInputs, PredictionResults, DefectParams } from "./lib/types";
 import { PRESETS, DEFAULT_DEFECT, DEFAULT_DEFECTS } from "./lib/presets";
 import { MAX_DEFECTS, COL } from "./lib/constants";
+import { MATERIAL_DB, LAYUP_DB, DEFAULT_MATERIAL_ID, DEFAULT_LAYUP_ID, DEFAULT_BC_MODE } from "./lib/materials";
 import { addHistoryEntry } from "./lib/project";
 
 function buildRawInputs(
   nDefects: number,
   pressureX: number,
   pressureY: number,
-  plyThickness: number,
-  layupRotation: number,
+  materialKey: string,
+  layupKey: string,
+  bcMode: string,
   defects: DefectParams[]
 ): RawInputs {
+  const mat = MATERIAL_DB[materialKey];
+  const layup = LAYUP_DB[layupKey];
   const raw: RawInputs = {
     n_defects: nDefects,
     pressure_x: pressureX,
     pressure_y: pressureY,
-    ply_thickness: plyThickness,
-    layup_rotation: layupRotation,
+    material_id: mat?.id ?? 1,
+    layup_id: layup?.id ?? 1,
+    bc_mode: bcMode,
   };
   for (let i = 0; i < MAX_DEFECTS; i++) {
     const d = defects[i] || DEFAULT_DEFECT;
@@ -78,7 +83,8 @@ function buildRawInputs(
 
 function formatResultsForExport(
   results: PredictionResults, nDefects: number,
-  pressureX?: number, pressureY?: number, plyThickness?: number, layupRotation?: number,
+  pressureX?: number, pressureY?: number,
+  materialKey?: string, layupKey?: string, bcMode?: string,
   defects?: DefectParams[]
 ): string {
   const lines: string[] = ["RP3 Prediction Results", "=====================", ""];
@@ -90,18 +96,24 @@ function formatResultsForExport(
   lines.push(`  Number of defects: ${nDefects}`);
   if (pressureX != null) lines.push(`  Pressure X: ${pressureX} MPa`);
   if (pressureY != null) lines.push(`  Pressure Y: ${pressureY} MPa`);
-  if (plyThickness != null) lines.push(`  Ply thickness: ${plyThickness} mm`);
-  if (layupRotation != null) lines.push(`  Layup rotation: ${layupRotation}°`);
+  if (materialKey) {
+    const mat = MATERIAL_DB[materialKey];
+    lines.push(`  Material: ${mat?.name ?? materialKey} (id=${mat?.id ?? "?"})`);
+  }
+  if (layupKey) {
+    const layup = LAYUP_DB[layupKey];
+    lines.push(`  Layup: ${layup?.name ?? layupKey} (id=${layup?.id ?? "?"})`);
+  }
+  if (bcMode) lines.push(`  BC Mode: ${bcMode}`);
   if (defects) {
     for (let i = 0; i < nDefects; i++) {
       const d = defects[i];
-      if (d) lines.push(`  Defect ${i+1}: x=${d.x}mm y=${d.y}mm len=${d.half_length*2}mm w=${d.width}mm θ=${d.angle}°`);
+      if (d) lines.push(`  Defect ${i+1}: x=${d.x}mm y=${d.y}mm len=${d.half_length*2}mm w=${d.width}mm th=${d.angle} deg`);
     }
   }
   lines.push("");
 
   lines.push("Stress Analysis:");
-  lines.push(`  Peak Stress (von Mises): ${fmtMPa(results.max_mises)}`);
   lines.push(`  Max Fibre Stress (S11):  ${fmtMPa(results.max_s11)}`);
   lines.push(`  Min Fibre Stress (S11):  ${fmtMPa(results.min_s11)}`);
   lines.push(`  Peak Shear (S12):        ${fmtMPa(results.max_s12)}`);
@@ -110,18 +122,13 @@ function formatResultsForExport(
   lines.push(`  Tsai-Wu Index:  ${fmt(results.tsai_wu_index)}`);
   lines.push(`  Tsai-Wu Failed: ${results.failed_tsai_wu === 1 ? "YES" : results.failed_tsai_wu === 0 ? "NO" : "--"}`);
   lines.push(`  Hashin Failed:  ${results.failed_hashin === 1 ? "YES" : results.failed_hashin === 0 ? "NO" : "--"}`);
+  lines.push(`  Puck Failed:    ${results.failed_puck === 1 ? "YES" : results.failed_puck === 0 ? "NO" : "--"}`);
+  lines.push(`  LaRC Failed:    ${results.failed_larc === 1 ? "YES" : results.failed_larc === 0 ? "NO" : "--"}`);
   lines.push("");
   lines.push("Hashin Damage Modes:");
   lines.push(`  Fibre Tension:      ${fmt(results.max_hashin_ft)}`);
-  lines.push(`  Fibre Compression:  ${fmt(results.max_hashin_fc)}`);
   lines.push(`  Matrix Tension:     ${fmt(results.max_hashin_mt)}`);
   lines.push(`  Matrix Compression: ${fmt(results.max_hashin_mc)}`);
-  lines.push("");
-  lines.push("Per-Defect Peak Stress:");
-  for (let i = 1; i <= nDefects; i++) {
-    const key = `max_mises_defect${i}` as keyof PredictionResults;
-    lines.push(`  Defect ${i}: ${fmtMPa(results[key] as number | undefined)}`);
-  }
   return lines.join("\n");
 }
 
@@ -165,8 +172,9 @@ function AppInner() {
   const [nDefects, setNDefects] = useState(3);
   const [pressureX, setPressureX] = useState(100.0);
   const [pressureY, setPressureY] = useState(0.0);
-  const [plyThickness, setPlyThickness] = useState(0.125);
-  const [layupRotation, setLayupRotation] = useState(0.0);
+  const [materialKey, setMaterialKey] = useState(DEFAULT_MATERIAL_ID);
+  const [layupKey, setLayupKey] = useState(DEFAULT_LAYUP_ID);
+  const [bcMode, setBcMode] = useState(DEFAULT_BC_MODE);
   const [defects, setDefects] = useState<DefectParams[]>(initDefects);
   const loadedRef = useRef(false);
 
@@ -177,7 +185,6 @@ function AppInner() {
   // UI state
   const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("analysis");
-  // Project save/compare removed — auto-save handles persistence
 
   // Auto-save state to localStorage so users don't lose work
   useEffect(() => {
@@ -188,8 +195,10 @@ function AppInner() {
         if (s.nDefects) setNDefects(s.nDefects);
         if (s.pressureX != null) setPressureX(s.pressureX);
         if (s.pressureY != null) setPressureY(s.pressureY);
-        if (s.plyThickness) setPlyThickness(s.plyThickness);
-        if (s.layupRotation != null) setLayupRotation(s.layupRotation);
+        if (s.materialKey) setMaterialKey(s.materialKey);
+        if (s.layupKey) setLayupKey(s.layupKey);
+        if (s.bcMode) setBcMode(s.bcMode);
+        // Legacy migration: ignore old plyThickness/layupRotation
         if (s.defects) setDefects(s.defects);
         if (s.laminateCode) setLaminateCode(s.laminateCode);
         if (s.laminateMaterialId) setLaminateMaterialId(s.laminateMaterialId);
@@ -200,12 +209,12 @@ function AppInner() {
   useEffect(() => {
     const timer = setTimeout(() => {
       localStorage.setItem("rp3-autosave", JSON.stringify({
-        nDefects, pressureX, pressureY, plyThickness, layupRotation,
+        nDefects, pressureX, pressureY, materialKey, layupKey, bcMode,
         defects, laminateCode, laminateMaterialId,
       }));
     }, 500); // debounce saves by 500ms
     return () => clearTimeout(timer);
-  }, [nDefects, pressureX, pressureY, plyThickness, layupRotation, defects, laminateCode, laminateMaterialId]);
+  }, [nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, laminateCode, laminateMaterialId]);
 
   // Load models on mount
   useEffect(() => {
@@ -248,8 +257,12 @@ function AppInner() {
     setNDefects(p.n_defects);
     setPressureX(p.pressure_x);
     setPressureY(p.pressure_y);
-    setPlyThickness(p.ply_thickness);
-    setLayupRotation(p.layup_rotation);
+    // Find material/layup keys by numeric id
+    const matEntry = Object.entries(MATERIAL_DB).find(([, m]) => m.id === p.material_id);
+    if (matEntry) setMaterialKey(matEntry[0]);
+    const layupEntry = Object.entries(LAYUP_DB).find(([, l]) => l.id === p.layup_id);
+    if (layupEntry) setLayupKey(layupEntry[0]);
+    setBcMode(p.bc_mode);
     const newDefects = initDefects();
     p.defects.forEach((d, i) => { newDefects[i] = { ...d }; });
     setDefects(newDefects);
@@ -263,7 +276,7 @@ function AppInner() {
     predictingRef.current = true;
     setPredicting(true);
     try {
-      const raw = buildRawInputs(nDefects, pressureX, pressureY, plyThickness, layupRotation, defects);
+      const raw = buildRawInputs(nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects);
       const resp = await invoke<{ ok: boolean; results: PredictionResults; error?: string }>("predict", { params: raw });
       if (resp.ok) {
         setResults(resp.results);
@@ -278,14 +291,14 @@ function AppInner() {
     }
     predictingRef.current = false;
     setPredicting(false);
-  }, [modelsReady, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects]);
+  }, [modelsReady, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects]);
 
   // Live prediction — auto-triggers on any input change (200ms debounce)
   useEffect(() => {
     if (!modelsReady) return;
     const timer = setTimeout(() => runPrediction(false), 200);
     return () => clearTimeout(timer);
-  }, [modelsReady, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects, runPrediction]);
+  }, [modelsReady, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects, runPrediction]);
 
   // Manual predict (Run button / Enter key) — also saves to history
   const handlePredict = useCallback(() => {
@@ -296,8 +309,9 @@ function AppInner() {
     setNDefects(3);
     setPressureX(100.0);
     setPressureY(0.0);
-    setPlyThickness(0.125);
-    setLayupRotation(0.0);
+    setMaterialKey(DEFAULT_MATERIAL_ID);
+    setLayupKey(DEFAULT_LAYUP_ID);
+    setBcMode(DEFAULT_BC_MODE);
     setDefects(initDefects());
     setResults(null);
     setStatus(modelsReady ? `Ready -- ${modelCount} models loaded` : "Loading models...");
@@ -305,12 +319,12 @@ function AppInner() {
 
   const handleExport = useCallback(() => {
     if (!results) return;
-    const text = formatResultsForExport(results, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects);
+    const text = formatResultsForExport(results, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects);
     navigator.clipboard.writeText(text).then(() => {
       setStatus("Results copied to clipboard");
       setTimeout(() => setStatus("Analysis complete"), 2000);
     });
-  }, [results, nDefects, pressureX, pressureY, plyThickness, layupRotation, defects]);
+  }, [results, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects]);
 
   // Enter key triggers predict — only when not focused on an input
   useEffect(() => {
@@ -334,7 +348,7 @@ function AppInner() {
   }, []);
 
   const canvasProps = {
-    nDefects, defects, pressureX, pressureY, layupRotation,
+    nDefects, defects, pressureX, pressureY,
   };
 
   return (
@@ -381,7 +395,6 @@ function AppInner() {
 
       {/* Tab content */}
       <div className="flex-1 min-h-0">
-        {/* Analysis tab — original layout */}
         {/* Analysis tab — inputs + predictions + laminate info */}
         {activeTab === "analysis" && (
           <div className="h-full grid grid-cols-1 lg:grid-cols-[45fr_55fr] min-h-0">
@@ -407,8 +420,9 @@ function AppInner() {
                 nDefects={nDefects} setNDefects={setNDefects}
                 pressureX={pressureX} setPressureX={setPressureX}
                 pressureY={pressureY} setPressureY={setPressureY}
-                plyThickness={plyThickness} setPlyThickness={setPlyThickness}
-                layupRotation={layupRotation} setLayupRotation={setLayupRotation}
+                materialKey={materialKey} setMaterialKey={setMaterialKey}
+                layupKey={layupKey} setLayupKey={setLayupKey}
+                bcMode={bcMode} setBcMode={setBcMode}
                 defects={defects} updateDefect={updateDefect}
               />
               {/* Laminate section — integrated into Analysis view */}
@@ -436,8 +450,9 @@ function AppInner() {
               nDefects={nDefects}
               pressureX={pressureX}
               pressureY={pressureY}
-              plyThickness={plyThickness}
-              layupRotation={layupRotation}
+              materialKey={materialKey}
+              layupKey={layupKey}
+              bcMode={bcMode}
               defects={defects}
               modelsReady={modelsReady}
             />

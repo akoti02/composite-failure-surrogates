@@ -67,4 +67,19 @@ src-tauri/
 
 ## Download
 
-Pre-built Windows release: see [Releases](../../releases) page.
+Pre-built **Windows x64** installer: see [Releases](https://github.com/akoti02/composite-failure-surrogates/releases) page.
+
+**macOS / Linux:** No pre-built binaries yet. Build from source:
+```bash
+# macOS — run the setup script, then build
+./setup-mac.sh
+npx tauri build
+
+# Linux — install deps manually, then build
+npm install
+pip3 install numpy xgboost scikit-learn pyinstaller
+cd sidecar && pyinstaller --onefile --name rp3-sidecar server.py \
+  --hidden-import inference --hidden-import _models_data \
+  --add-data "_models_data.py:." && cd ..
+npx tauri build
+```

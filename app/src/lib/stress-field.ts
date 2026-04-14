@@ -324,7 +324,7 @@ export function computeStressField(
 ): StressFieldResult {
   // Default orthotropic material for characteristic roots
   const mat: MaterialProperties = material ?? {
-    id: "default", name: "default", description: "",
+    id: 0, name: "default", description: "",
     E1: 181, E2: 10.3, G12: 7.17, v12: 0.28,
     Xt: 1500, Xc: 1500, Yt: 40, Yc: 246, S12: 68,
     plyThickness: 0.125,

@@ -33,8 +33,6 @@ interface Props {
   predictions?: PredictionResults | null;
   laminateCode?: string;
   laminateMaterialId?: string;
-  plyThickness?: number;
-  layupRotation?: number;
 }
 
 // Field options per view mode
@@ -180,7 +178,7 @@ function extractPlyFieldData(
   return { data, min, max };
 }
 
-export function StressHeatmap({ defects, nDefects, pressureX, pressureY, predictions, laminateCode, laminateMaterialId, plyThickness: _plyThickness, layupRotation: _layupRotation }: Props) {
+export function StressHeatmap({ defects, nDefects, pressureX, pressureY, predictions, laminateCode, laminateMaterialId }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // View state
@@ -224,10 +222,10 @@ export function StressHeatmap({ defects, nDefects, pressureX, pressureY, predict
     }
   }, [plyAngles.length, selectedPly]);
 
-  // ML scaling
+  // ML scaling — uses max_s11 as the calibration target (V11 no longer predicts max_mises)
   const mlScaleResult = useMemo(() => {
-    if (!baseResult || !mlCalibrated || !predictions?.max_mises) return null;
-    return applyMLScaling(baseResult, predictions.max_mises, material);
+    if (!baseResult || !mlCalibrated || !predictions?.max_s11) return null;
+    return applyMLScaling(baseResult, predictions.max_s11, material);
   }, [baseResult, mlCalibrated, predictions, material]);
 
   const effectiveResult = mlScaleResult?.scaled ?? baseResult;
@@ -393,7 +391,7 @@ export function StressHeatmap({ defects, nDefects, pressureX, pressureY, predict
     return field === "tsaiWu" ? "" : "MPa";
   }, [viewMode, field]);
 
-  const hasMLPrediction = predictions?.max_mises != null && isFinite(predictions.max_mises!);
+  const hasMLPrediction = predictions?.max_s11 != null && isFinite(predictions.max_s11!);
 
   return (
     <div className="flex flex-col h-full gap-2">

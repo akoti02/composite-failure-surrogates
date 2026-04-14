@@ -14,8 +14,9 @@ export interface AnalysisSnapshot {
   nDefects: number;
   pressureX: number;
   pressureY: number;
-  plyThickness: number;
-  layupRotation: number;
+  materialKey: string;
+  layupKey: string;
+  bcMode: string;
   defects: DefectParams[];
   // Results (if run)
   results: PredictionResults | null;
@@ -98,8 +99,9 @@ export function createSnapshot(
   nDefects: number,
   pressureX: number,
   pressureY: number,
-  plyThickness: number,
-  layupRotation: number,
+  materialKey: string,
+  layupKey: string,
+  bcMode: string,
   defects: DefectParams[],
   results: PredictionResults | null,
   notes = "",
@@ -112,8 +114,9 @@ export function createSnapshot(
     nDefects,
     pressureX,
     pressureY,
-    plyThickness,
-    layupRotation,
+    materialKey,
+    layupKey,
+    bcMode,
     defects: defects.map(d => ({ ...d })),
     results: results ? { ...results } : null,
     notes,
@@ -198,7 +201,7 @@ export interface HistoryEntry {
   nDefects: number;
   pressureX: number;
   pressureY: number;
-  maxMises: number | null;
+  maxS11: number | null;
   tsaiWuIndex: number | null;
   failedTsaiWu: boolean | null;
   failedHashin: boolean | null;
@@ -218,7 +221,7 @@ export function addHistoryEntry(
       nDefects,
       pressureX,
       pressureY,
-      maxMises: results.max_mises ?? null,
+      maxS11: results.max_s11 ?? null,
       tsaiWuIndex: results.tsai_wu_index ?? null,
       failedTsaiWu: results.failed_tsai_wu != null ? results.failed_tsai_wu === 1 : null,
       failedHashin: results.failed_hashin != null ? results.failed_hashin === 1 : null,

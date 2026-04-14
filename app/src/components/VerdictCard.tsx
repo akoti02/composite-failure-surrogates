@@ -8,13 +8,17 @@ function getVerdict(results: PredictionResults | null): { level: VerdictLevel; t
   const tw = results.tsai_wu_index ?? 0;
   const ftw = results.failed_tsai_wu ?? 0;
   const fh = results.failed_hashin ?? 0;
-  const isFailed = ftw === 1 || fh === 1 || tw >= 1.0;
+  const fp = results.failed_puck ?? 0;
+  const fl = results.failed_larc ?? 0;
+  const isFailed = ftw === 1 || fh === 1 || fp === 1 || fl === 1 || tw >= 1.0;
   const isWarning = !isFailed && tw >= 0.8;
 
   if (isFailed) {
     const modes: string[] = [];
     if (ftw === 1) modes.push("Tsai-Wu");
     if (fh === 1) modes.push("Hashin");
+    if (fp === 1) modes.push("Puck");
+    if (fl === 1) modes.push("LaRC");
     return {
       level: "failure",
       title: "FAILURE PREDICTED",
