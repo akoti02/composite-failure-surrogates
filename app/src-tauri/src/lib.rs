@@ -42,9 +42,21 @@ fn spawn_sidecar() -> Result<SidecarProc, String> {
         Command::new(exe_dir.join(if cfg!(target_os = "windows") { "rp3-sidecar.exe" } else { "rp3-sidecar" }))
     };
 
+    // Redirect stderr to a log file instead of discarding it entirely.
+    // Direct pipe to parent would deadlock on Windows if buffer fills, so
+    // we write to ~/.rp3/sidecar_stderr.log for post-mortem debugging.
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_else(|_| ".".to_string());
+    let log_dir = std::path::PathBuf::from(home).join(".rp3");
+    let _ = std::fs::create_dir_all(&log_dir);
+    let stderr_target = std::fs::File::create(log_dir.join("sidecar_stderr.log"))
+        .map(Stdio::from)
+        .unwrap_or_else(|_| Stdio::null());
+
     cmd.stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null()) // Discard stderr to prevent deadlock on Windows
+        .stderr(stderr_target)
         .env("PYTHONUNBUFFERED", "1"); // Prevent stdout buffering deadlock
 
     #[cfg(target_os = "windows")]

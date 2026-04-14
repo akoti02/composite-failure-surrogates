@@ -10,9 +10,10 @@ interface Props {
   hasResults: boolean;
   onPredict: () => void;
   onReset: () => void;
+  onProjects: () => void;
 }
 
-export function Header({ status, modelsReady, predicting, onPreset, onExport, hasResults, onPredict, onReset }: Props) {
+export function Header({ status, modelsReady, predicting, onPreset, onExport, hasResults, onPredict, onReset, onProjects }: Props) {
   const dotColor = predicting ? COL.accent : modelsReady ? COL.success : COL.textDim;
   const dotClass = predicting ? "dot-pulse-fast" : modelsReady ? "" : "dot-pulse";
   const dotLabel = predicting ? "Computing" : modelsReady ? "Live" : "Loading";
@@ -69,6 +70,23 @@ export function Header({ status, modelsReady, predicting, onPreset, onExport, ha
             Export
           </button>
         )}
+
+        <button
+          className="text-[11px] px-2.5 py-1 rounded-md cursor-pointer transition-colors flex items-center gap-1.5"
+          style={{
+            background: COL.panel,
+            border: `1px solid ${COL.border}`,
+            color: COL.textMid,
+          }}
+          onClick={onProjects}
+          aria-label="Open project manager"
+          data-tooltip="Snapshots & comparison"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+          </svg>
+          Projects
+        </button>
 
         {/* Reset icon button */}
         <button

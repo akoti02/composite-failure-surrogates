@@ -43,7 +43,9 @@ import { FocusModal } from "./components/FocusModal";
 import { SplashScreen } from "./components/SplashScreen";
 import { LaminateBuilder } from "./components/LaminateBuilder";
 import { DesignExplorer } from "./components/DesignExplorer";
+import { ProjectManager } from "./components/ProjectManager";
 import type { RawInputs, PredictionResults, DefectParams } from "./lib/types";
+import type { AnalysisSnapshot } from "./lib/project";
 import { PRESETS, DEFAULT_DEFECT, DEFAULT_DEFECTS } from "./lib/presets";
 import { MAX_DEFECTS, COL } from "./lib/constants";
 import { MATERIAL_DB, LAYUP_DB, DEFAULT_MATERIAL_ID, DEFAULT_LAYUP_ID, DEFAULT_BC_MODE } from "./lib/materials";
@@ -185,6 +187,8 @@ function AppInner() {
   // UI state
   const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
   const [activeTab, setActiveTab] = useState<AppTab>("analysis");
+  const [showProjects, setShowProjects] = useState(false);
+  const [compareSnapshots, setCompareSnapshots] = useState<AnalysisSnapshot[]>([]);
 
   // Auto-save state to localStorage so users don't lose work
   useEffect(() => {
@@ -270,6 +274,8 @@ function AppInner() {
   }, []);
 
   // Core prediction function — used by both auto-predict and manual Run
+  // Note: predictingRef check + set is safe because JS is single-threaded;
+  // no other code can run between the guard check and the flag set.
   const predictingRef = useRef(false);
   const runPrediction = useCallback(async (saveToHistory: boolean) => {
     if (!modelsReady || predictingRef.current) return;
@@ -323,8 +329,31 @@ function AppInner() {
     navigator.clipboard.writeText(text).then(() => {
       setStatus("Results copied to clipboard");
       setTimeout(() => setStatus("Analysis complete"), 2000);
+    }).catch(() => {
+      setStatus("Clipboard write failed");
     });
   }, [results, nDefects, pressureX, pressureY, materialKey, layupKey, bcMode, defects]);
+
+  const handleRestoreSnapshot = useCallback((snap: AnalysisSnapshot) => {
+    setNDefects(snap.nDefects);
+    setPressureX(snap.pressureX);
+    setPressureY(snap.pressureY);
+    setMaterialKey(snap.materialKey);
+    setLayupKey(snap.layupKey);
+    setBcMode(snap.bcMode);
+    const newDefects = initDefects();
+    snap.defects.forEach((d, i) => { newDefects[i] = { ...d }; });
+    setDefects(newDefects);
+    setResults(snap.results);
+  }, []);
+
+  const handleToggleCompare = useCallback((snap: AnalysisSnapshot) => {
+    setCompareSnapshots(prev =>
+      prev.some(s => s.id === snap.id)
+        ? prev.filter(s => s.id !== snap.id)
+        : [...prev, snap]
+    );
+  }, []);
 
   // Enter key triggers predict — only when not focused on an input
   useEffect(() => {
@@ -358,6 +387,7 @@ function AppInner() {
         status={status} modelsReady={modelsReady} predicting={predicting}
         onPreset={handlePreset} onExport={handleExport} hasResults={results !== null}
         onPredict={handlePredict} onReset={handleReset}
+        onProjects={() => setShowProjects(true)}
       />
 
       {/* Tab bar — arrow keys navigate between tabs */}
@@ -481,6 +511,21 @@ function AppInner() {
         title="Results"
       >
         <ResultsPanel results={results} nDefects={nDefects} />
+      </FocusModal>
+
+      <FocusModal
+        open={showProjects}
+        onClose={() => setShowProjects(false)}
+        title="Projects"
+      >
+        <ProjectManager
+          nDefects={nDefects} pressureX={pressureX} pressureY={pressureY}
+          materialKey={materialKey} layupKey={layupKey} bcMode={bcMode}
+          defects={defects} results={results}
+          onRestoreSnapshot={handleRestoreSnapshot}
+          compareSnapshots={compareSnapshots}
+          onToggleCompare={handleToggleCompare}
+        />
       </FocusModal>
 
       <SplashScreen onReady={modelsReady} />

@@ -37,7 +37,6 @@ export interface Project {
 
 const STORAGE_KEY = "rp3_project";
 const HISTORY_KEY = "rp3_history";
-const MAX_UNDO = 50;
 
 /** Generate a unique ID */
 function uid(): string {
@@ -152,43 +151,6 @@ export function updateSnapshot(project: Project, snapshotId: string, updates: Pa
     snapshots: project.snapshots.map(s =>
       s.id === snapshotId ? { ...s, ...updates } : s
     ),
-  };
-}
-
-// ─── Undo/Redo System ───
-
-export interface UndoState {
-  past: string[];     // JSON-serialized states
-  future: string[];
-}
-
-export function createUndoState(): UndoState {
-  return { past: [], future: [] };
-}
-
-export function pushUndoState(undo: UndoState, stateJSON: string): UndoState {
-  const past = [...undo.past, stateJSON];
-  if (past.length > MAX_UNDO) past.shift();
-  return { past, future: [] };
-}
-
-export function undoState(undo: UndoState, currentJSON: string): { undo: UndoState; restored: string } | null {
-  if (undo.past.length === 0) return null;
-  const past = [...undo.past];
-  const restored = past.pop()!;
-  return {
-    undo: { past, future: [...undo.future, currentJSON] },
-    restored,
-  };
-}
-
-export function redoState(undo: UndoState, currentJSON: string): { undo: UndoState; restored: string } | null {
-  if (undo.future.length === 0) return null;
-  const future = [...undo.future];
-  const restored = future.pop()!;
-  return {
-    undo: { past: [...undo.past, currentJSON], future },
-    restored,
   };
 }
 

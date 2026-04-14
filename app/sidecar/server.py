@@ -91,11 +91,67 @@ def handle_load_models():
             "load_time_s": round(elapsed, 2)}
 
 
+def _validate_params(params):
+    """Validate and clamp input parameters to training-data bounds."""
+    clamped = dict(params)
+    # Clamp pressure to [-500, 500] MPa
+    for key in ("pressure_x", "pressure_y"):
+        if key in clamped:
+            try:
+                clamped[key] = max(-500.0, min(500.0, float(clamped[key])))
+            except (TypeError, ValueError):
+                clamped[key] = 0.0
+    # Clamp n_defects to [1, 5]
+    try:
+        clamped["n_defects"] = max(1, min(5, int(clamped.get("n_defects", 1))))
+    except (TypeError, ValueError):
+        clamped["n_defects"] = 1
+    # Validate material_id and layup_id against known sets
+    valid_materials = {1, 5, 8, 12, 15}
+    valid_layups = {1, 3, 4, 6, 7, 13}
+    valid_bcs = {"tension_comp", "biaxial", "uniaxial_shear"}
+    try:
+        mid = int(clamped.get("material_id", 1))
+        clamped["material_id"] = mid if mid in valid_materials else 1
+    except (TypeError, ValueError):
+        clamped["material_id"] = 1
+    try:
+        lid = int(clamped.get("layup_id", 1))
+        clamped["layup_id"] = lid if lid in valid_layups else 1
+    except (TypeError, ValueError):
+        clamped["layup_id"] = 1
+    if clamped.get("bc_mode") not in valid_bcs:
+        clamped["bc_mode"] = "tension_comp"
+    # Clamp defect geometry per defect
+    n = clamped["n_defects"]
+    for i in range(1, n + 1):
+        for key, lo, hi, default in [
+            (f"defect{i}_x", 0, 100, 50),
+            (f"defect{i}_y", 0, 50, 25),
+            (f"defect{i}_half_length", 0.1, 50, 5),
+            (f"defect{i}_width", 0.01, 10, 0.5),
+            (f"defect{i}_angle", -90, 90, 0),
+            (f"defect{i}_roughness", 0, 1, 0.5),
+        ]:
+            try:
+                clamped[key] = max(lo, min(hi, float(clamped.get(key, default))))
+            except (TypeError, ValueError):
+                clamped[key] = default
+    return clamped
+
+
+# Regression targets that should never be negative (physical floor = 0)
+_NON_NEGATIVE_TARGETS = {
+    "tsai_wu_index", "max_hashin_ft", "max_hashin_mt", "max_hashin_mc",
+}
+
+
 def handle_predict(params):
     if _models is None:
         return {"ok": False, "error": "Models not loaded"}
     if not isinstance(params, dict):
         return {"ok": False, "error": "Invalid params: expected dict"}
+    params = _validate_params(params)
     features = build_feature_vector(params, _feature_names)
     results = {}
     errors = {}
@@ -105,7 +161,10 @@ def handle_predict(params):
             continue
         try:
             val = predict_single(model_entry, scaler, features, target_name=target)
-            results[target] = val  # sanitized by _sanitize_response before JSON output
+            # Clamp failure indices to >= 0 (negative is physically meaningless)
+            if target in _NON_NEGATIVE_TARGETS and val is not None and val < 0:
+                val = 0.0
+            results[target] = val
         except Exception as e:
             results[target] = None
             errors[target] = str(e)
